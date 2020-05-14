@@ -7,6 +7,14 @@ import random
 
 np.set_printoptions(threshold=sys.maxsize)
 
+def compute_C(D):
+    c = np.zeros(D.shape)
+    for i in range(D.shape[0]):
+        for j in range(D.shape[0]):
+            c[i,j] = np.count_nonzero(D[:,j]-D[:,i]<0) + np.count_nonzero(D[i,:]-D[j,:]<0) 
+           
+    return c
+
 def get_sol_x_by_x(x,n):
     def myfunc():
         values = []
