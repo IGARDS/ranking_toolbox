@@ -60,9 +60,36 @@ def random_generator(size=6, chars=string.ascii_uppercase + string.digits):
 def round_Xn(Xn,mult=10):
     return round(mult*Xn)*1./mult
 
+import math
+
 def nCr(n,r):
     f = math.factorial
     return f(n) // f(r) // f(n-r)
+
+def calc_con_dis(perm_x,perm_y):
+    ncon = 0
+    ndis = 0
+    for i in range(len(perm_x)): # i is an item
+        i_x = np.where(np.array(perm_x)==i)[0] # location of i in perm_x
+        i_y = np.where(np.array(perm_y)==i)[0] # location of i in perm_y
+        for j in range(i+1,len(perm_x)): # j is another item
+            j_x = np.where(np.array(perm_x)==j)[0] # location of j in perm_x
+            j_y = np.where(np.array(perm_y)==j)[0] # location of j in perm_y
+            if i_x-j_x > 0 and i_y-j_y < 0:
+                ndis += 1
+            elif i_x-j_x < 0 and i_y-j_y > 0:
+                ndis += 1
+            elif i_x-j_x > 0 and i_y-j_y > 0:
+                ncon += 1
+            elif i_x-j_x < 0 and i_y-j_y < 0:
+                ncon += 1
+    return ncon, ndis
+
+def tau(perm_x,perm_y):
+    n = len(perm_x)
+    ncon,ndis = calc_con_dis(perm_x,perm_y)
+    return (ncon - ndis)/nCr(n,2)
+    
 
 def nPr(n,r):
     f = math.factorial

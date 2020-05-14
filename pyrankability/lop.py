@@ -361,11 +361,13 @@ def bilp_two_most_similar(D,lazy=False,verbose=True):
     
 
 
-def bilp_two_most_distant(D,lazy=False,verbose=True):
+def bilp_two_most_distant(D,D2=None,lazy=False,verbose=True):
     first_k, first_details = bilp(D,lazy=lazy,verbose=verbose)
     if verbose:
         print('Finished first optimization. Obj:',first_k)
     n = D.shape[0]
+    if D2 is not None:
+        assert n == D2.shape[0]
         
     AP = Model('lop')
 
@@ -396,8 +398,12 @@ def bilp_two_most_distant(D,lazy=False,verbose=True):
     AP.update()
     
     AP.addConstr(quicksum((D[i,j]-D[j,i])*x[i,j]+D[j,i] for i in range(n-1) for j in range(i+1,n)) == first_k)
-    AP.addConstr(quicksum((D[i,j]-D[j,i])*y[i,j]+D[j,i] for i in range(n-1) for j in range(i+1,n)) == first_k)
-    
+    second_k = first_k
+    if D2 is not None:
+        second_k, second_details = bilp(D2,lazy=lazy,verbose=verbose)
+        AP.addConstr(quicksum((D2[i,j]-D2[j,i])*y[i,j]+D2[j,i] for i in range(n-1) for j in range(i+1,n)) == second_k)
+    else:
+        AP.addConstr(quicksum((D[i,j]-D[j,i])*y[i,j]+D[j,i] for i in range(n-1) for j in range(i+1,n)) == first_k)
 
     AP.update()
     for i in range(n-1):
@@ -433,11 +439,14 @@ def bilp_two_most_distant(D,lazy=False,verbose=True):
     perm_y = tuple([int(item) for item in ranking])
     
     k_x = np.sum(D*sol_x)
-    k_y = np.sum(D*sol_y)
+    if D2 is not None:
+        k_y = np.sum(D2*sol_y)
+    else:
+        k_y = np.sum(D*sol_y)
     
     details = {"obj":AP.objVal,"k_x": k_x, "k_y":k_y, "perm_x":perm_x,"perm_y":perm_y, "x": sol_x,"y":sol_y,"u":sol_u,"v":sol_v}
             
-    return first_k,details
+    return AP.objVal,details
     
 
 def bilp(D_orig,num_random_restarts=0,lazy=False,verbose=False,find_pair=False):
