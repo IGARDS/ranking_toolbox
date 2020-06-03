@@ -4,31 +4,55 @@ import json
 import sys
 import string
 import random
+import tempfile
+import os
 
 np.set_printoptions(threshold=sys.maxsize)
+
+def get_temp_model_path():
+    temp_dir = tempfile.mkdtemp()
+    model_file = os.path.join(temp_dir,"model.mps")
+    return model_file
+
+def write_model(AP,model_file=None):
+    if model_file is None:
+        model_file = get_temp_model_path()
+    AP.write(model_file)
+    return model_file
 
 def compute_C(D):
     c = np.zeros(D.shape)
     for i in range(D.shape[0]):
         for j in range(D.shape[0]):
             c[i,j] = np.count_nonzero(D[:,j]-D[:,i]<0) + np.count_nonzero(D[i,:]-D[j,:]<0) 
-           
     return c
 
-def get_sol_x_by_x(x,n):
+# I'm not sure this works exactly the same for LOP
+def perm_to_x(perm):
+    x = np.triu(np.ones((len(perm),len(perm))),1)
+    order = np.argsort(np.array(perm))
+    x = 1-x[np.ix_(order,order)]
+    return x
+
+def get_sol_x_by_x(x,n,cont=False):
+    f = int
+    default = 0
+    if cont:
+        f = float
+        default = 0.0
     def myfunc():
         values = []
         for i in range(n):
             for j in range(n):
                 if (i,j) in x:
-                    values.append(int(x[i,j].X))
+                    values.append(f(x[i,j].X))
                 else:
                     if i==j:
-                        values.append(0)
+                        values.append(default)
                     elif i < j:
-                        values.append(int(x[i,j].X))
+                        values.append(f(x[i,j].X))
                     else:
-                        values.append(int(1-x[j,i].X))
+                        values.append(f(1-x[j,i].X))
         return np.reshape(values,(n,n))
     return myfunc
 
