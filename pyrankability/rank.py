@@ -13,6 +13,226 @@ from joblib import Parallel, delayed
 
 from .common import *
 
+from .construct import *
+
+def solve(S_orig, c_orig = None, indices = None, method=["lop","hillside"][1],num_random_restarts=0,lazy=False,verbose=False,find_pair=False,cont=False):
+    n = S_orig.shape[0]
+    
+    temp_dir = tempfile.mkdtemp(dir="/dev/shm") # try to write this model to memory
+    
+    if indices is None:
+        indices = list(range(n))
+    sorted(indices)
+    
+    if method == 'hillside':
+        if c_orig is None:
+            c_orig = C_count(S_orig)
+        c_orig = c_orig.values
+        
+    orig_columns = S_orig.columns
+    orig_index = S_orig.index
+    S_orig = S_orig.values
+    
+    try:
+        Pfirst = []
+        Pfinal = []
+        objs = []
+        xs = []
+        pair_Pfirst = []
+        pair_Pfinal = []
+        pair_objs = []
+        pair_xs = []
+        first_k = None
+        for ix in range(num_random_restarts+1):
+            if ix > 0:
+                perm_inxs = np.random.permutation(range(S_orig.shape[0]))
+                S = S_orig[perm_inxs,:][:,perm_inxs]
+            else:
+                perm_inxs = np.arange(n)
+                S = copy.deepcopy(S_orig)  
+                
+            if method == 'hillside':
+                c = c_orig[perm_inxs,:][:,perm_inxs]
+                    
+            model_file = os.path.join(temp_dir,"model.mps")
+            if os.path.isfile(model_file):
+                AP = read(model_file)
+                x = {}
+                for i in range(n-1):
+                    for j in range(i+1,n):
+                        x[i,j] = AP.getVarByName("x(%s,%s)"%(i,j))
+            else:
+                AP = Model(method)
+
+                x = {}
+
+                nvars = 0
+                indices_hash = {}
+                for iix,i in enumerate(indices):
+                    indices_hash[i] = True
+                for i in range(n-1):
+                    for j in range(i+1,n):
+                        if i in indices_hash and j in indices_hash:
+                            if cont == True:
+                                x[i,j] = AP.addVar(lb=0,vtype="C",ub=1,name="x(%s,%s)"%(i,j)) #continuous
+                            else:
+                                x[i,j] = AP.addVar(lb=0,vtype=GRB.BINARY,ub=1,name="x(%s,%s)"%(i,j)) #binary
+                        elif i in indices_hash:
+                            x[i,j] = 1
+                        else:
+                            x[i,j] = 0
+                        nvars += 1
+
+                AP.update()
+                ncons = 0
+                for i in range(n):
+                    for j in range(i+1,n):
+                        for k in range(j+1,n):
+                            trans_cons = []
+                            trans_cons.append(AP.addConstr(x[i,j] + x[j,k] - x[i,k] <= 1))
+                            trans_cons.append(AP.addConstr(x[i,j] + x[j,k] - x[i,k] >= 0))
+                            ncons += 2
+                            if lazy:
+                                for cons in trans_cons:
+                                    cons.setAttr(GRB.Attr.Lazy,1)
+                                    
+                AP.update()
+                AP.write(model_file)
+            if first_k is not None:
+                if method == 'lop':
+                    AP.addConstr(quicksum((S[i,j]-S[j,i])*x[i,j]+S[j,i] for i in range(n-1) for j in range(i+1,n)) == first_k)
+                elif method == 'hillside':
+                    AP.setObjective(quicksum((c[i,j]-c[j,i])*x[i,j]+c[j,i] for i in range(n-1) for j in range(i+1,n)),GRB.MINIMIZE)
+
+            tic = time.perf_counter()
+            if method == 'lop':
+                AP.setObjective(quicksum((S[i,j]-S[j,i])*x[i,j]+S[j,i] for i in range(n-1) for j in range(i+1,n)),GRB.MAXIMIZE)
+            elif method == 'hillside':
+                AP.setObjective(quicksum((c[i,j]-c[j,i])*x[i,j]+c[j,i] for i in range(n-1) for j in range(i+1,n)),GRB.MINIMIZE)
+            AP.setParam( 'OutputFlag', verbose )
+            AP.update()
+            toc = time.perf_counter()
+            if verbose:
+                print(f"Updating opjective in {toc - tic:0.4f} seconds")
+
+            if verbose:
+                print('Start optimization %d'%ix)
+            tic = time.perf_counter()
+            AP.params.Threads=7
+            AP.update()
+            if cont:
+                AP.Params.Method = 2
+                AP.Params.Crossover = 0    
+                AP.update()
+            AP.optimize()
+            toc = time.perf_counter()
+            if verbose:
+                print(f"Optimization in {toc - tic:0.4f} seconds")
+                print('End optimization %d'%ix)
+
+            k=AP.objVal
+            if first_k is None:
+                first_k = k
+
+            P = []
+            sol_x = get_sol_x_by_x(x,n,cont=cont)()
+            orig_sol_x = sol_x
+            reorder = np.argsort(perm_inxs)
+            sol_x = sol_x[np.ix_(reorder,reorder)]
+            r = np.sum(sol_x,axis=0)
+            ranking = np.argsort(r)
+            P.append(tuple(ranking))
+            xs.append(sol_x)
+
+            if ix == 0:
+                Pfirst = P
+                xfirst = get_sol_x_by_x(x,n,cont=cont)()
+
+            Pfinal.extend(P)
+            if method == 'lop':
+                objs.append(np.sum(S_orig*sol_x))
+            elif method == 'hillside':
+                objs.append(np.sum(c_orig*sol_x))
+
+            if find_pair:
+                AP = read(model_file)
+                x = {}
+                for i in range(n-1):
+                    for j in range(i+1,n):
+                        x[i,j] = AP.getVarByName("x(%s,%s)"%(i,j))
+                if method == 'lop':
+                    AP.addConstr(quicksum((S[i,j]-S[j,i])*x[i,j]+S[j,i] for i in range(n-1) for j in range(i+1,n))==first_k)
+                elif method == 'hillside':
+                    AP.addConstr(quicksum((c[i,j]-c[j,i])*x[i,j]+c[j,i] for i in range(n-1) for j in range(i+1,n))==first_k)                
+                AP.update()
+                u={}
+                v={}
+                b={}
+                for i in range(n-1):
+                    for j in range(i+1,n):
+                        u[i,j] = AP.addVar(name="u(%s,%s)"%(i,j),lb=0)
+                        v[i,j] = AP.addVar(name="v(%s,%s)"%(i,j),lb=0)
+                        b[i,j] = AP.addVar(lb=0,vtype=GRB.BINARY,ub=1,name="b(%s,%s)"%(i,j))
+                AP.update()
+                for i in range(n-1):
+                    for j in range(i+1,n):
+                        AP.addConstr(u[i,j] - v[i,j] == x[i,j] - orig_sol_x[i,j])
+                        AP.addConstr(u[i,j] <= b[i,j])
+                        AP.addConstr(v[i,j] <= 1 - b[i,j])
+                AP.update()
+
+                AP.setObjective(quicksum(u[i,j]+v[i,j] for i in range(n-1) for j in range(i+1,n)),GRB.MAXIMIZE)
+                AP.setParam( 'OutputFlag', verbose )
+                AP.update()
+
+                if verbose:
+                    print('Start pair optimization %d'%ix)
+                tic = time.perf_counter()
+
+                if cont:
+                    AP.Params.Method = 2
+                    AP.Params.Crossover = 0    
+                    AP.update()
+
+                AP.optimize()
+                toc = time.perf_counter()
+                if verbose:
+                    print(f"Optimization in {toc - tic:0.4f} seconds")
+                    print('End optimization %d'%ix)
+
+                P = []
+                sol_x = get_sol_x_by_x(x,n,cont=cont)()[np.ix_(reorder,reorder)]
+                sol_u = get_sol_x_by_x(u,n)()[np.ix_(reorder,reorder)]
+                sol_v = get_sol_x_by_x(v,n)()[np.ix_(reorder,reorder)]
+                r = np.sum(sol_x,axis=0)
+                ranking = np.argsort(r)
+                P.append(tuple(ranking))
+                pair_xs.append(sol_x)
+                if method == 'lop':
+                    k = np.sum(np.sum(S_orig*sol_x))
+                elif method == 'hillside':
+                    k = np.sum(np.sum(c_orig*sol_x))
+
+                if ix == 0:
+                    pair_Pfirst = P
+                    pair_xfirst = get_sol_x_by_x(x,n)() 
+
+                pair_Pfinal.extend(P)
+                pair_objs.append(k)
+
+        details = {"Pfirst": Pfirst, "P":Pfinal,"x": xfirst,"objs":objs,"xs":xs}
+        pair_details = None
+        if find_pair:
+            pair_details = {"Pfirst": pair_Pfirst, "P":pair_Pfinal,"x": pair_xfirst,"objs":pair_objs,"xs":pair_xs}
+        details["pair_details"] = pair_details
+
+        details['method'] = method
+        details['indices'] = indices
+    finally:
+        shutil.rmtree(temp_dir)
+        
+    return k,details
+
 def solve_exhaustive_error(D_orig,max_error=0,min_error=0,method=["lop","hillside"][1],tol=1e-6):
     P = []
     k = None
@@ -313,7 +533,7 @@ def solve_error2(D_orig,max_error=10,min_error=0,method=["lop","hillside"][1],nu
 def solve_error(D_orig,max_error=10,min_error=0,method=["lop","hillside"][1],num_random_restarts=0,lazy=False,verbose=False,find_pair=False,cont=False):
     models = {}
     if max_error > 0:
-        opt_k,opt_details,opt_models = solve_error(D_orig,max_error=0,min_error=0,num_random_restarts=num_random_restarts,method=method,lazy=lazy,verbose=verbose,cont=cont)
+        opt_k,opt_details,opt_models = solve_error(D_orig,max_error=0,min_error=0,num_random_restarts=num_random_restarts,method=method,lazy=lazy,verbose=verbose,cont=False)
         opt_tol = opt_models['error_models'][0].Params.OptimalityTol
         models['zero_error_models'] = opt_models
     else:
@@ -387,8 +607,8 @@ def solve_error(D_orig,max_error=10,min_error=0,method=["lop","hillside"][1],num
                     else:
                         print('Adding error varible')
                         error = AP.addVar(lb=min_error,ub=max_error,vtype="I",name="error")
-                    #AP.addConstr(error <= max_error)
-                    #AP.addConstr(error >= min_error)
+                        AP.addConstr(error >= min_error)
+                        AP.addConstr(error <= max_error)
                 else:
                     error = 0                
 
@@ -399,15 +619,17 @@ def solve_error(D_orig,max_error=10,min_error=0,method=["lop","hillside"][1],num
                 if method == 'lop':
                     AP.addConstr(quicksum((D[i,j]-D[j,i])*x[i,j]+D[j,i] for i in range(n-1) for j in range(i+1,n)) + error >= opt_k - opt_tol)
                 elif method == 'hillside':
-                    AP.addConstr(quicksum((c[i,j]-c[j,i])*x[i,j]+c[j,i] for i in range(n-1) for j in range(i+1,n)) - error == opt_k)
-                    #AP.addConstr(quicksum((c[i,j]-c[j,i])*x[i,j]+c[j,i] for i in range(n-1) for j in range(i+1,n)) - error >= opt_k)
-                    #AP.addConstr(quicksum((c[i,j]-c[j,i])*x[i,j]+c[j,i] for i in range(n-1) for j in range(i+1,n)) - error <= opt_k)
+                    AP.addConstr(quicksum((c[i,j]-c[j,i])*x[i,j]+c[j,i] for i in range(n-1) for j in range(i+1,n)) >= opt_k + error)
+                    AP.addConstr(quicksum((c[i,j]-c[j,i])*(1-x[i,j])+c[j,i] for i in range(n-1) for j in range(i+1,n)) <= np.sum(np.sum(c)) - opt_k - error)
 
             tic = time.perf_counter()
             if method == 'lop':
                 AP.setObjective(quicksum((D[i,j]-D[j,i])*x[i,j]+D[j,i] for i in range(n-1) for j in range(i+1,n)),GRB.MAXIMIZE)
             elif method == 'hillside':
-                AP.setObjective(quicksum((c[i,j]-c[j,i])*x[i,j]+c[j,i] for i in range(n-1) for j in range(i+1,n)),GRB.MINIMIZE)
+                if error != 0:
+                    AP.setObjective(quicksum((c[i,j]-c[j,i])*x[i,j]+c[j,i] for i in range(n-1) for j in range(i+1,n)),GRB.MAXIMIZE)
+                else:
+                    AP.setObjective(quicksum((c[i,j]-c[j,i])*x[i,j]+c[j,i] for i in range(n-1) for j in range(i+1,n)),GRB.MINIMIZE)
             AP.setParam( 'OutputFlag', verbose )
             AP.update()
             toc = time.perf_counter()
@@ -544,199 +766,7 @@ def solve_error(D_orig,max_error=10,min_error=0,method=["lop","hillside"][1],num
     return k,details,models
 
 
-def solve(D_orig,method=["lop","hillside"][1],c_orig=None,num_random_restarts=0,lazy=False,verbose=False,find_pair=False,cont=False):
-    n = D_orig.shape[0]
-    
-    temp_dir = tempfile.mkdtemp(dir="/dev/shm") # try to write this model to memory
-    
-    try:
-    
-        if c_orig is None and method == 'hillside':
-            c_orig = compute_C(D_orig)
 
-        Pfirst = []
-        Pfinal = []
-        objs = []
-        xs = []
-        pair_Pfirst = []
-        pair_Pfinal = []
-        pair_objs = []
-        pair_xs = []
-        first_k = None
-        for ix in range(num_random_restarts+1):
-            if ix > 0:
-                perm_inxs = np.random.permutation(range(D_orig.shape[0]))
-                D = D_orig[perm_inxs,:][:,perm_inxs]
-            else:
-                perm_inxs = np.arange(n)
-                D = copy.deepcopy(D_orig)
-
-            if method == 'hillside':
-                c = c_orig[perm_inxs,:][:,perm_inxs]
-
-            model_file = os.path.join(temp_dir,"model.mps")
-            if os.path.isfile(model_file):
-                AP = read(model_file)
-                x = {}
-                for i in range(n-1):
-                    for j in range(i+1,n):
-                        x[i,j] = AP.getVarByName("x(%s,%s)"%(i,j))
-            else:
-                AP = Model(method)
-
-                x = {}
-
-                for i in range(n-1):
-                    for j in range(i+1,n):
-                        if cont == True:
-                            x[i,j] = AP.addVar(lb=0,vtype="C",ub=1,name="x(%s,%s)"%(i,j)) #continuous
-                        else:
-                            x[i,j] = AP.addVar(lb=0,vtype=GRB.BINARY,ub=1,name="x(%s,%s)"%(i,j)) #binary
-
-                AP.update()
-                for i in range(n):
-                    for j in range(i+1,n):
-                        for k in range(j+1,n):
-                            trans_cons = []
-                            trans_cons.append(AP.addConstr(x[i,j] + x[j,k] - x[i,k] <= 1))
-                            trans_cons.append(AP.addConstr(x[i,j] + x[j,k] - x[i,k] >= 0))
-                            if lazy:
-                                for cons in trans_cons:
-                                    cons.setAttr(GRB.Attr.Lazy,1)
-
-                AP.update()
-                AP.write(model_file)
-            if first_k is not None:
-                if method == 'lop':
-                    AP.addConstr(quicksum((D[i,j]-D[j,i])*x[i,j]+D[j,i] for i in range(n-1) for j in range(i+1,n)) == first_k)
-                elif method == 'hillside':
-                    AP.setObjective(quicksum((c[i,j]-c[j,i])*x[i,j]+c[j,i] for i in range(n-1) for j in range(i+1,n)),GRB.MINIMIZE)
-
-            tic = time.perf_counter()
-            if method == 'lop':
-                AP.setObjective(quicksum((D[i,j]-D[j,i])*x[i,j]+D[j,i] for i in range(n-1) for j in range(i+1,n)),GRB.MAXIMIZE)
-            elif method == 'hillside':
-                AP.setObjective(quicksum((c[i,j]-c[j,i])*x[i,j]+c[j,i] for i in range(n-1) for j in range(i+1,n)),GRB.MINIMIZE)
-            AP.setParam( 'OutputFlag', verbose )
-            AP.update()
-            toc = time.perf_counter()
-            if verbose:
-                print(f"Updating opjective in {toc - tic:0.4f} seconds")
-
-            if verbose:
-                print('Start optimization %d'%ix)
-            tic = time.perf_counter()
-            if cont:
-                AP.Params.Method = 2
-                AP.Params.Crossover = 0    
-                AP.update()
-            AP.optimize()
-            toc = time.perf_counter()
-            if verbose:
-                print(f"Optimization in {toc - tic:0.4f} seconds")
-                print('End optimization %d'%ix)
-
-            k=AP.objVal
-            if first_k is None:
-                first_k = k
-
-            P = []
-            sol_x = get_sol_x_by_x(x,n,cont=cont)()
-            orig_sol_x = sol_x
-            reorder = np.argsort(perm_inxs)
-            sol_x = sol_x[np.ix_(reorder,reorder)]
-            r = np.sum(sol_x,axis=0)
-            ranking = np.argsort(r)
-            P.append(tuple(ranking))
-            xs.append(sol_x)
-
-            if ix == 0:
-                Pfirst = P
-                xfirst = get_sol_x_by_x(x,n,cont=cont)()
-
-            Pfinal.extend(P)
-            if method == 'lop':
-                objs.append(np.sum(D_orig*sol_x))
-            elif method == 'hillside':
-                objs.append(np.sum(c_orig*sol_x))
-
-            if find_pair:
-                AP = read(model_file)
-                x = {}
-                for i in range(n-1):
-                    for j in range(i+1,n):
-                        x[i,j] = AP.getVarByName("x(%s,%s)"%(i,j))
-                if method == 'lop':
-                    AP.addConstr(quicksum((D[i,j]-D[j,i])*x[i,j]+D[j,i] for i in range(n-1) for j in range(i+1,n))==first_k)
-                elif method == 'hillside':
-                    AP.addConstr(quicksum((c[i,j]-c[j,i])*x[i,j]+c[j,i] for i in range(n-1) for j in range(i+1,n))==first_k)                
-                AP.update()
-                u={}
-                v={}
-                b={}
-                for i in range(n-1):
-                    for j in range(i+1,n):
-                        u[i,j] = AP.addVar(name="u(%s,%s)"%(i,j),lb=0)
-                        v[i,j] = AP.addVar(name="v(%s,%s)"%(i,j),lb=0)
-                        b[i,j] = AP.addVar(lb=0,vtype=GRB.BINARY,ub=1,name="b(%s,%s)"%(i,j))
-                AP.update()
-                for i in range(n-1):
-                    for j in range(i+1,n):
-                        AP.addConstr(u[i,j] - v[i,j] == x[i,j] - orig_sol_x[i,j])
-                        AP.addConstr(u[i,j] <= b[i,j])
-                        AP.addConstr(v[i,j] <= 1 - b[i,j])
-                AP.update()
-
-                AP.setObjective(quicksum(u[i,j]+v[i,j] for i in range(n-1) for j in range(i+1,n)),GRB.MAXIMIZE)
-                AP.setParam( 'OutputFlag', verbose )
-                AP.update()
-
-                if verbose:
-                    print('Start pair optimization %d'%ix)
-                tic = time.perf_counter()
-
-                if cont:
-                    AP.Params.Method = 2
-                    AP.Params.Crossover = 0    
-                    AP.update()
-
-                AP.optimize()
-                toc = time.perf_counter()
-                if verbose:
-                    print(f"Optimization in {toc - tic:0.4f} seconds")
-                    print('End optimization %d'%ix)
-
-                P = []
-                sol_x = get_sol_x_by_x(x,n,cont=cont)()[np.ix_(reorder,reorder)]
-                sol_u = get_sol_x_by_x(u,n)()[np.ix_(reorder,reorder)]
-                sol_v = get_sol_x_by_x(v,n)()[np.ix_(reorder,reorder)]
-                r = np.sum(sol_x,axis=0)
-                ranking = np.argsort(r)
-                P.append(tuple(ranking))
-                pair_xs.append(sol_x)
-                if method == 'lop':
-                    k = np.sum(np.sum(D_orig*sol_x))
-                elif method == 'hillside':
-                    k = np.sum(np.sum(c_orig*sol_x))
-
-                if ix == 0:
-                    pair_Pfirst = P
-                    pair_xfirst = get_sol_x_by_x(x,n)() 
-
-                pair_Pfinal.extend(P)
-                pair_objs.append(k)
-
-        details = {"Pfirst": Pfirst, "P":Pfinal,"x": xfirst,"objs":objs,"xs":xs}
-        pair_details = None
-        if find_pair:
-            pair_details = {"Pfirst": pair_Pfirst, "P":pair_Pfinal,"x": pair_xfirst,"objs":pair_objs,"xs":pair_xs}
-        details["pair_details"] = pair_details
-
-        details['method'] = method
-    finally:
-        shutil.rmtree(temp_dir)
-        
-    return k,details
 
 def lp(D,relaxation_method=None,level=2):
     n = D.shape[0]

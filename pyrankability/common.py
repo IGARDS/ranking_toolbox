@@ -44,15 +44,22 @@ def get_sol_x_by_x(x,n,cont=False):
         values = []
         for i in range(n):
             for j in range(n):
-                if (i,j) in x:
-                    values.append(f(x[i,j].X))
-                else:
-                    if i==j:
-                        values.append(default)
-                    elif i < j:
-                        values.append(f(x[i,j].X))
+                if i==j:
+                    values.append(default)
+                elif (i,j) in x:
+                    if type(x[i,j]) == int or type(x[i,j]) == float:
+                        values.append(f(x[i,j]))
                     else:
-                        values.append(f(1-x[j,i].X))
+                        values.append(f(x[i,j].X))
+                elif (j,i) in x:
+                    if type(x[j,i]) == int or type(x[j,i]) == float:
+                        values.append(f(1-x[j,i]))                    
+                    else:
+                        values.append(f(1-x[j,i].X))                    
+                elif i < j: # don't care about this pair
+                    values.append(default)
+                else:
+                    values.append(1-default)
         return np.reshape(values,(n,n))
     return myfunc
 
