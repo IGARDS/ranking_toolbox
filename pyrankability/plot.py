@@ -127,6 +127,12 @@ def show_score_xstar(xstars,indices=None,group_label="Group",fixed_r=None,resolv
     )
     if resolve_scale:
         g = g.resolve_scale(x='independent',y='independent')
+        
+    g.configure_title(
+        fontSize=12,
+        font='Times',
+        orient='bottom'
+    )
     return g,score_df,ordered_xstars
 
 def show_score_xstar2(xstars,indices=None,group_label="Group",fixed_r=None,resolve_scale=False,columns=1,width=300,height=300):
@@ -149,7 +155,8 @@ def show_score_xstar2(xstars,indices=None,group_label="Group",fixed_r=None,resol
         x.loc[:,:] = threshold_x(x.values)
         ordered_xstars[key] = xstar
         inxs = np.triu_indices(len(xstar),k=1)
-        xstar_upper = xstar.values[inxs[0],inxs[1]]
+        xstar_upper = xstar.values[inxs]
+        #import pdb; pdb.set_trace()
         nfrac_upper = sum((xstar_upper > 0) & (xstar_upper < 1))
         none_upper = sum(xstar_upper == 1)
         nzero_upper = sum(xstar_upper == 0)
@@ -172,13 +179,13 @@ def show_score_xstar2(xstars,indices=None,group_label="Group",fixed_r=None,resol
     g = alt.Chart(all_df,width=width).mark_square().encode(
         x=alt.X(
             'i:N',
-            axis=alt.Axis(labelOverlap=False),
+            axis=alt.Axis(labelOverlap=False,labelFontSize=8),
             title="r",
             sort=alt.EncodingSortField(field="ri",order="ascending") # The order to sort in
         ),
         y=alt.Y(
             'j:N',
-            axis=alt.Axis(labelOverlap=False),
+            axis=alt.Axis(labelOverlap=False,labelFontSize=8),
             title="r",
             sort=alt.EncodingSortField(field="rj",order="ascending") # The order to sort in
         ),
@@ -187,9 +194,20 @@ def show_score_xstar2(xstars,indices=None,group_label="Group",fixed_r=None,resol
         width=width,
         height=height
     ).facet(
-        facet=alt.Column("%s:N"%group_label, title=None),
+        facet=alt.Column(title=None,field=alt.Field(group_label),type='nominal',header=alt.Header(labelFontSize=12,labelOrient='bottom')),
+        #alt.Column("%s:N"%group_label, title=,header=alt.Header(labelBaseline="bottom")),
         columns=columns
+    ).configure_axis(
+        labelFontSize=10,
+        titleFontSize=10
     )
+    
+    #g= g.configure_title(
+    #    fontSize=12,
+    #    font='Times',
+    #    titleAnchor='bottom'
+    #)
+    
     if resolve_scale:
         g = g.resolve_scale(x='independent',y='independent')
     return g,score_df,ordered_xstars

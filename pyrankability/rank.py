@@ -49,7 +49,11 @@ def solve(S_orig, c_orig = None, indices = None, method=["lop","hillside"][1],nu
                 S = S_orig[perm_inxs,:][:,perm_inxs]
             else:
                 perm_inxs = np.arange(n)
-                S = copy.deepcopy(S_orig)  
+                S = copy.deepcopy(S_orig)
+            #include_score = np.zeros(S.shape)
+            #inxs_num = np.where(~np.isnan(S))
+            #include_score[inxs_num] = 1
+            
                 
             if method == 'hillside':
                 c = c_orig[perm_inxs,:][:,perm_inxs]
@@ -153,6 +157,14 @@ def solve(S_orig, c_orig = None, indices = None, method=["lop","hillside"][1],nu
                 objs.append(np.sum(S_orig*sol_x))
             elif method == 'hillside':
                 objs.append(np.sum(c_orig*sol_x))
+                
+            if first_k is not None:
+                if method == 'lop':
+                    AP.addConstr(quicksum((S[i,j]-S[j,i])*x[i,j]+S[j,i] for i in range(n-1) for j in range(i+1,n)) == first_k)
+                elif method == 'hillside':
+                    AP.setObjective(quicksum((c[i,j]-c[j,i])*x[i,j]+c[j,i] for i in range(n-1) for j in range(i+1,n)),GRB.MINIMIZE)
+            details = {"Pfirst": Pfirst, "P":Pfinal,"x": xfirst,"objs":objs,"xs":xs}
+            details['model'] = AP
 
             if find_pair:
                 AP = read(model_file)
@@ -220,7 +232,6 @@ def solve(S_orig, c_orig = None, indices = None, method=["lop","hillside"][1],nu
                 pair_Pfinal.extend(P)
                 pair_objs.append(k)
 
-        details = {"Pfirst": Pfirst, "P":Pfinal,"x": xfirst,"objs":objs,"xs":xs}
         pair_details = None
         if find_pair:
             pair_details = {"Pfirst": pair_Pfirst, "P":pair_Pfinal,"x": pair_xfirst,"objs":pair_objs,"xs":pair_xs}
@@ -228,6 +239,7 @@ def solve(S_orig, c_orig = None, indices = None, method=["lop","hillside"][1],nu
 
         details['method'] = method
         details['indices'] = indices
+        
     finally:
         shutil.rmtree(temp_dir)
         

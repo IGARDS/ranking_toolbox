@@ -5,7 +5,7 @@ import pandas as pd
 
 from joblib import Parallel, delayed
 
-def link(game_df,team_i,team_k,value_map):
+def link(game_df,team_i,team_k):
     team_j_i = "team1"
     if team_i == "team1":
         team_j_i = "team2"
@@ -38,9 +38,9 @@ def V_count_vectorized(game_df,value_map):
     sorted(all_names)
     reset_game_df = game_df.reset_index()
 
-    linked = link(reset_game_df,"team1","team1",value_map)
-    linked=linked.append(link(reset_game_df,"team2","team2",value_map))
-    linked=linked.append(link(reset_game_df,"team2","team1",value_map))
+    linked = link(reset_game_df,"team1","team1")
+    linked=linked.append(link(reset_game_df,"team2","team2"))
+    linked=linked.append(link(reset_game_df,"team2","team1"))
     linked.index=list(range(len(linked)))
     linked["games"] = linked["game_i_j"].astype(str)+","+linked["game_k_j"].astype(str)
     linked.loc[linked["game_k_j"] < linked["game_i_j"],"games"] = linked["game_k_j"].astype(str)+","+linked["game_i_j"].astype(str)
