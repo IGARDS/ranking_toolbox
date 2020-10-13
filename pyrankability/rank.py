@@ -18,6 +18,9 @@ from .construct import *
 def solve(S_orig, c_orig = None, indices = None, method=["lop","hillside"][1],num_random_restarts=0,lazy=False,verbose=False,find_pair=False,cont=False):
     n = S_orig.shape[0]
     
+    # Pass verbosity flag to Gurobi prior to any calls
+    setParam( 'OutputFlag', verbose )
+    
     temp_dir = tempfile.mkdtemp(dir="/dev/shm") # try to write this model to memory
     
     if indices is None:
@@ -113,7 +116,6 @@ def solve(S_orig, c_orig = None, indices = None, method=["lop","hillside"][1],nu
                 AP.setObjective(quicksum((S[i,j]-S[j,i])*x[i,j]+S[j,i] for i in range(n-1) for j in range(i+1,n)),GRB.MAXIMIZE)
             elif method == 'hillside':
                 AP.setObjective(quicksum((c[i,j]-c[j,i])*x[i,j]+c[j,i] for i in range(n-1) for j in range(i+1,n)),GRB.MINIMIZE)
-            AP.setParam( 'OutputFlag', verbose )
             AP.update()
             toc = time.perf_counter()
             if verbose:
