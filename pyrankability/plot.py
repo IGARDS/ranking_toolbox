@@ -211,3 +211,33 @@ def show_score_xstar2(xstars,indices=None,group_label="Group",fixed_r=None,resol
     if resolve_scale:
         g = g.resolve_scale(x='independent',y='independent')
     return g,score_df,ordered_xstars
+
+def show_hillside(V,P0):
+    perm=pd.Series(P0,index=V.columns)
+    r=perm.argsort()
+    #V_G=V.iloc[perm,:].iloc[:,perm]
+
+    #x = pd.DataFrame(details['x'],index=V.index,columns=V.columns).iloc[perm,:].iloc[:,perm]
+    #r = x.sum(axis=1)
+
+    df=V.T.stack().to_frame().reset_index()
+    df.columns=["team_i_name","team_k_name","v"]
+    df["ri"] = list(-r.loc[df["team_i_name"]])
+    df["rk"] = list(r.loc[df["team_k_name"]])
+
+    g=alt.Chart(df).mark_circle().encode(
+        x=alt.X(
+            'team_i_name:N',
+            axis=alt.Axis(labelOverlap=False),
+            title="r",
+            sort=alt.SortField(field="ri",order="descending") # The order to sort in
+        ),
+        y=alt.Y(
+            'team_k_name:N',
+            axis=alt.Axis(labelOverlap=False),
+            title="r",
+            sort=alt.SortField(field="rk",order="ascending") # The order to sort in
+        ),
+        size='v:Q'
+    )
+    return g
