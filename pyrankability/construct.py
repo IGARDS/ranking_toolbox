@@ -147,7 +147,7 @@ def support_map_vectorized_direct_indirect_weighted(linked,direct_thres=1,spread
     return ret
 
 
-def colley_matrices(linked,direct_thres=1,spread_thres=0,weight_indirect=0.5,verbose=False):
+def colley_matrices(linked,direct_thres=1,spread_thres=0,weight_indirect=0.5,verbose=False,reordering=None):
     # columns
     # 'team_j', 'team_i_name', 'team_i_score', 'team_i_H_A_N',
     # 'team_j_i_score', 'team_j_i_H_A_N', 'game_i_j', 'team_k_name',
@@ -168,18 +168,8 @@ def colley_matrices(linked,direct_thres=1,spread_thres=0,weight_indirect=0.5,ver
     #######################################
     # part to modify
     d_ik = linked['team_i_score'] - linked['team_j_i_score']
-    gameWeight = (linked["direct"] & (d_ik > 0)).astype(int)
-    
-    linked["index_ik"]=index_ik
-    linked["index_ki"]=index_ki
-    linked["gameWeight"]=gameWeight
-    
-    ret1 = linked.set_index(index_ik)["gameWeight"]
-    ret2 = linked.set_index(index_ki)["gameWeight"]
-    ret = ret1.append(ret2)
-    colleyMatrix = -ret.groupby(level=[0,1]).sum()
-    colleyMatrix = colleyMatrix.unstack()
-    colleyMatrix.values[np.diag_indices(len(colleyMatrix))] = -colleyMatrix.sum()
+    gameWeight = (linked["direct"] & (d_ik > 0)).astype(int) # seems like the thresholds don't fit in here according to tim
+    gameWeight += (linked["direct"] & (d_ik < 0)).astype(int)
     
     support_ik = 1/2*(linked["direct"] & (d_ik > direct_thres)).astype(int)
     support_ki = 1/2*(linked["direct"] & (d_ik < -direct_thres)).astype(int)
@@ -193,6 +183,10 @@ def colley_matrices(linked,direct_thres=1,spread_thres=0,weight_indirect=0.5,ver
     
     # always a positive and it captures that if i beat j by 5 points and k beat j by 2 points then this spread is 3
     spread = np.abs(d_ij - d_kj) 
+
+    # again seems like the thresholds don't matter here
+    gameWeight += weight_indirect*((linked["indirect"]) & (d_ij > 0) & (d_kj < 0) & (spread > 0)).astype(int)    
+    gameWeight += weight_indirect*((linked["indirect"]) & (d_kj > 0) & (d_ij < 0) & (spread > 0)).astype(int)
     
     support_ik += 1/2*weight_indirect*((linked["indirect"]) & (d_ij > 0) & (d_kj < 0) & (spread > spread_thres)).astype(int)    
     support_ki += 1/2*weight_indirect*((linked["indirect"]) & (d_kj > 0) & (d_ij < 0) & (spread > spread_thres)).astype(int)
@@ -208,15 +202,28 @@ def colley_matrices(linked,direct_thres=1,spread_thres=0,weight_indirect=0.5,ver
     linked["penalty_ki"]=penalty_ki
     linked["index_ik"]=index_ik
     linked["index_ki"]=index_ki
+    linked["gameWeight"]=gameWeight
+
+    ret1 = linked.set_index(index_ik)["gameWeight"]
+    ret2 = linked.set_index(index_ki)["gameWeight"]
+    ret = ret1.append(ret2)
+    colleyMatrix = -ret.groupby(level=[0,1]).sum()
+    colleyMatrix = colleyMatrix.unstack()
+    colleyMatrix.values[np.diag_indices(len(colleyMatrix))] = -colleyMatrix.sum()+2 # ask tim about this plus 2
  
     ret1 = linked.set_index(index_ik)["support_ik"]+linked.set_index(index_ik)["penalty_ik"]
     ret2 = linked.set_index(index_ki)["support_ki"]+linked.set_index(index_ki)["penalty_ki"]
     ret = ret1.append(ret2)
     ret = ret.groupby(level=[0,1]).sum()
     b = ret.unstack().sum(axis=1)
+    
+    if reordering is not None:
+        colleyMatrix = colleyMatrix.loc[reordering,reordering]
+        b = b.loc[reordering]
+    
     return colleyMatrix,b
 
-def massey_matrices(linked,direct_thres=1,spread_thres=0,weight_indirect=0.5,verbose=False):
+def massey_matrices(linked,direct_thres=1,spread_thres=0,weight_indirect=0.5,verbose=False,reordering=None):
     # columns
     # 'team_j', 'team_i_name', 'team_i_score', 'team_i_H_A_N',
     # 'team_j_i_score', 'team_j_i_H_A_N', 'game_i_j', 'team_k_name',
@@ -237,18 +244,8 @@ def massey_matrices(linked,direct_thres=1,spread_thres=0,weight_indirect=0.5,ver
     #######################################
     # part to modify
     d_ik = linked['team_i_score'] - linked['team_j_i_score']
-    gameWeight = (linked["direct"] & (np.abs(d_ik) > 0)).astype(int)
-    
-    linked["index_ik"]=index_ik
-    linked["index_ki"]=index_ki
-    linked["gameWeight"]=gameWeight
-    
-    ret1 = linked.set_index(index_ik)["gameWeight"]
-    ret2 = linked.set_index(index_ki)["gameWeight"]
-    ret = ret1.append(ret2)
-    masseyMatrix = -ret.groupby(level=[0,1]).sum()
-    masseyMatrix = masseyMatrix.unstack()
-    masseyMatrix.values[np.diag_indices(len(masseyMatrix))] = -masseyMatrix.sum()
+    gameWeight = (linked["direct"] & (d_ik > 0)).astype(int) # seems like the thresholds don't fit in here according to tim
+    gameWeight += (linked["direct"] & (d_ik < 0)).astype(int)    
     
     support_ik = np.abs(d_ik)*(linked["direct"] & (d_ik > direct_thres)).astype(int)
     support_ki = np.abs(d_ik)*(linked["direct"] & (d_ik < -direct_thres)).astype(int)
@@ -262,6 +259,10 @@ def massey_matrices(linked,direct_thres=1,spread_thres=0,weight_indirect=0.5,ver
     
     # always a positive and it captures that if i beat j by 5 points and k beat j by 2 points then this spread is 3
     spread = np.abs(d_ij - d_kj) 
+    
+    # again seems like the thresholds don't matter here
+    gameWeight += weight_indirect*((linked["indirect"]) & (d_ij > 0) & (d_kj < 0) & (spread > 0)).astype(int)    
+    gameWeight += weight_indirect*((linked["indirect"]) & (d_kj > 0) & (d_ij < 0) & (spread > 0)).astype(int)
     
     support_ik += spread*weight_indirect*((linked["indirect"]) & (d_ij > 0) & (d_kj < 0) & (spread > spread_thres)).astype(int)    
     support_ki += spread*weight_indirect*((linked["indirect"]) & (d_kj > 0) & (d_ij < 0) & (spread > spread_thres)).astype(int)
@@ -277,20 +278,39 @@ def massey_matrices(linked,direct_thres=1,spread_thres=0,weight_indirect=0.5,ver
     linked["penalty_ki"]=penalty_ki
     linked["index_ik"]=index_ik
     linked["index_ki"]=index_ki
- 
+    linked["gameWeight"]=gameWeight
+
+    ret1 = linked.set_index(index_ik)["gameWeight"]
+    ret2 = linked.set_index(index_ki)["gameWeight"]
+    ret = ret1.append(ret2)
+    masseyMatrix = -ret.groupby(level=[0,1]).sum()
+    masseyMatrix = masseyMatrix.unstack()
+    masseyMatrix.values[np.diag_indices(len(masseyMatrix))] = -masseyMatrix.sum()
+
     ret1 = linked.set_index(index_ik)["support_ik"]+linked.set_index(index_ik)["penalty_ik"]
     ret2 = linked.set_index(index_ki)["support_ki"]+linked.set_index(index_ki)["penalty_ki"]
     ret = ret1.append(ret2)
     ret = ret.groupby(level=[0,1]).sum()
     b = ret.unstack().sum(axis=1)
     
+    if reordering is not None:
+        masseyMatrix = masseyMatrix.loc[reordering,reordering]
+        b = b.loc[reordering]
+        
     masseyMatrix.values[-1,:] = np.ones((1,len(masseyMatrix)))
-    b.iloc[-1] = 0
+    b.values[-1] = 0
     
     return masseyMatrix,b
 
-def ranking_from_matrices(matrix,b):
-    r = np.linalg.solve(matrix,b)
+def ranking_from_matrices(matrix,b,inxs):
+    try:
+        r = np.linalg.solve(matrix,b)
+    except:
+        r = np.dot(np.linalg.pinv(matrix),b)
+    r=list(r)
+    for ix in inxs:
+        r.insert(ix,-np.Inf)
+    r=np.array(r)
     iSort = np.argsort(-r)
     return iSort, r
 
