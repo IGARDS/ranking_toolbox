@@ -6,6 +6,7 @@ import string
 import random
 import tempfile
 import os
+import copy
 
 np.set_printoptions(threshold=sys.maxsize)
 
@@ -21,6 +22,9 @@ def write_model(AP,model_file=None):
     return model_file
 
 def compute_C(D):
+    D = copy.copy(D)
+    for i in range(D.shape[0]):
+        D[i,i] = np.nan
     c = np.zeros(D.shape)
     for i in range(D.shape[0]):
         for j in range(D.shape[0]):
