@@ -15,7 +15,12 @@ from .common import *
 
 from .construct import *
 
-def solve(S_orig, c_orig = None, indices = None, method=["lop","hillside"][1],num_random_restarts=0,lazy=False,verbose=False,find_pair=False,cont=False):
+solve_methods = ["lop","hillside"]
+
+def solve(S_orig, c_orig = None, indices = None, method="hillside",num_random_restarts=0,lazy=False,verbose=False,find_pair=False,cont=False,include_model=False):
+    if method not in solve_methods:
+        raise Exception(f"Method '{method}' not implemented")
+    
     n = S_orig.shape[0]
     
     # Pass verbosity flag to Gurobi prior to any calls
@@ -245,6 +250,16 @@ def solve(S_orig, c_orig = None, indices = None, method=["lop","hillside"][1],nu
     finally:
         shutil.rmtree(temp_dir)
         
+    details['obj'] = k
+    if method == 'hillside':
+        k = round(k)
+    elif method == 'lop': # switch to delta
+        perm = np.array(Pfirst[0])
+        Dre = S_orig[perm,:][:,perm]
+        #print(k,np.sum(np.triu(Dre)))
+        k = np.sum(np.tril(Dre,k=-1))
+    if not include_model:
+        del details['model']
     return k,details
 
 def solve_exhaustive_error(D_orig,max_error=0,min_error=0,method=["lop","hillside"][1],tol=1e-6):

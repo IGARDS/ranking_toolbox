@@ -9,6 +9,27 @@ from .common import *
 
 alt.data_transformers.disable_max_rows()
 
+from networkx.drawing.nx_agraph import graphviz_layout, to_agraph
+import pygraphviz as pgv
+
+from IPython.display import Image
+
+def draw(A):
+    return Image(A.draw(format='png', prog='dot'))
+
+def D_as_graph(D,file=None):
+    G = nx.DiGraph()
+    for i in D.index:
+        for j in D.columns:
+            if D.loc[i,j] != 0:
+                G.add_edge(i,j,width=D.loc[i,j],label=D.loc[i,j])
+                
+    A = to_agraph(G)
+    A.layout('dot')
+    if file is not None:
+        A.draw(file)
+    return draw(A)
+
 # Given something like:
 # A = [4, 10, 1, 12, 3, 9, 0, 6, 5, 11, 2, 8, 7]
 # B = [5, 4, 10, 1, 7, 6, 12, 3, 9, 0, 11, 2, 8]
@@ -63,11 +84,16 @@ def spider(P2,file=None,fig_format="PNG",width=5,height=10):
 
     nx.draw_networkx_labels(G,pos=pos,labels=labels)
 
-    color_map = y.map({"A":"blue","B":"red"})
-    nx.draw(G, pos, edges=edges, node_color=color_map)
+    color_map = y.map({"A":"white","B":"white"})
+    nx.draw(G, pos, node_color=color_map)
+    
+    #A = to_agraph(G)
+    #A.layout('dot')
+    
+    #nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
     if file is not None:
-        plt.savefig(file, fig_format="PNG")
-    plt.show()
+        #A.draw(file)
+        plt.savefig(file)
     
 def show_score_xstar(xstars,indices=None,group_label="Group",fixed_r=None,resolve_scale=False,columns=1,width=300,height=300):
     all_df = pd.DataFrame(columns=["i","j","x",group_label,"ri","rj"])
@@ -194,7 +220,7 @@ def show_score_xstar2(xstars,indices=None,group_label="Group",fixed_r=None,resol
         width=width,
         height=height
     ).facet(
-        facet=alt.Column(title=None,field=alt.Field(group_label),type='nominal',header=alt.Header(labelFontSize=12,labelOrient='bottom')),
+        facet=alt.Column(title=None,field=alt.Field(group_label),type='nominal',header=alt.Header(labelFontSize=50,labelOrient='bottom')),
         #alt.Column("%s:N"%group_label, title=,header=alt.Header(labelBaseline="bottom")),
         columns=columns
     ).configure_axis(

@@ -88,6 +88,8 @@ def support_map_vectorized_direct_indirect_weighted(linked,direct_thres=1,spread
     # 'team_k_score', 'team_k_H_A_N', 'team_j_k_score', 'team_j_k_H_A_N',
     # 'game_k_j'
     linked["direct"] = linked["game_i_j"] == linked["game_k_j"] #linked["team_i_name"] == linked["team_k_name"]
+    if weight_indirect == 0: # Remove any non-direct
+        linked = linked.loc[linked["direct"]].copy()
     linked["indirect"] = linked["team_i_name"] != linked["team_k_name"]
     # | (linked["team_i_name"] == linked["team_j_k_name"]) | (linked["team_k_name"] == linked["team_j_k_name"])
     for_index1 = linked[["team_i_name","team_k_name"]].copy()
@@ -107,15 +109,16 @@ def support_map_vectorized_direct_indirect_weighted(linked,direct_thres=1,spread
     support_ki = (linked["direct"] & (d_ik < -direct_thres)).astype(int)
 
     # indirect
-    d_ij = linked["team_i_score"] - linked["team_j_i_score"]
-    d_kj = linked["team_k_score"] - linked["team_j_k_score"]
-    
-    # always a positive and it captures that if i beat j by 5 points and k beat j by 2 points then this spread is 3
-    spread = np.abs(d_ij - d_kj) 
-    
-    support_ik += weight_indirect*((linked["indirect"]) & (d_ij > 0) & (d_kj < 0) & (spread > spread_thres)).astype(int)
-    
-    support_ki += weight_indirect*((linked["indirect"]) & (d_kj > 0) & (d_ij < 0) & (spread > spread_thres)).astype(int)
+    if weight_indirect > 0:
+        d_ij = linked["team_i_score"] - linked["team_j_i_score"]
+        d_kj = linked["team_k_score"] - linked["team_j_k_score"]
+
+        # always a positive and it captures that if i beat j by 5 points and k beat j by 2 points then this spread is 3
+        spread = np.abs(d_ij - d_kj) 
+
+        support_ik += weight_indirect*((linked["indirect"]) & (d_ij > 0) & (d_kj < 0) & (spread > spread_thres)).astype(int)
+
+        support_ki += weight_indirect*((linked["indirect"]) & (d_kj > 0) & (d_ij < 0) & (spread > spread_thres)).astype(int)
     
     # end part to modify
     #######################################    

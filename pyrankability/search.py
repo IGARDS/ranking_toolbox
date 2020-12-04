@@ -13,14 +13,16 @@ from joblib import Parallel, delayed
 
 from .rank import *
 
-from .common import *
+from .construct import *
+
+# TODO: change all solve returns to use obj instead of k
 
 def solve_max_tau(D,orig_k,orig_sol_x,method=["lop","hillside"][1],lazy=False,verbose=False) :
     n = D.shape[0]
     AP = Model(method)
     
     if method == 'hillside':
-        c = compute_C(D)
+        c = C_count(D)
 
     x = {}
 
@@ -41,9 +43,9 @@ def solve_max_tau(D,orig_k,orig_sol_x,method=["lop","hillside"][1],lazy=False,ve
 
     AP.update()
     if method == 'lop':
-        AP.addConstr(quicksum((D[i,j]-D[j,i])*x[i,j]+D[j,i] for i in range(n-1) for j in range(i+1,n))==orig_k)
+        AP.addConstr(quicksum((D.iloc[i,j]-D.iloc[j,i])*x[i,j]+D.iloc[j,i] for i in range(n-1) for j in range(i+1,n))==orig_k)
     elif method == 'hillside':
-        AP.addConstr(quicksum((c[i,j]-c[j,i])*x[i,j]+c[j,i] for i in range(n-1) for j in range(i+1,n))==orig_k)                
+        AP.addConstr(quicksum((c.iloc[i,j]-c.iloc[j,i])*x[i,j]+c.iloc[j,i] for i in range(n-1) for j in range(i+1,n))==orig_k)                
     AP.update()
     
     u={}
@@ -195,10 +197,10 @@ def solve_pair_min_tau(D,D2=None,method=["lop","hillside"][1],lazy=False,verbose
         if D2 is not None:
             c2 = D2
     elif method == 'hillside':
-        c1 = compute_C(D)
+        c1 = C_count(D)
         c2 = c1
         if D2 is not None:
-            c2 = compute_C(D2)
+            c2 = C_count(D2)
 
     x = {}
     y = {}
@@ -226,8 +228,8 @@ def solve_pair_min_tau(D,D2=None,method=["lop","hillside"][1],lazy=False,verbose
                         cons.setAttr(GRB.Attr.Lazy,1)
     AP.update()
     
-    AP.addConstr(quicksum((c1[i,j]-c1[j,i])*x[i,j]+c1[j,i] for i in range(n-1) for j in range(i+1,n)) == first_k)
-    AP.addConstr(quicksum((c2[i,j]-c2[j,i])*y[i,j]+c2[j,i] for i in range(n-1) for j in range(i+1,n)) == second_k)
+    AP.addConstr(quicksum((c1.iloc[i,j]-c1.iloc[j,i])*x[i,j]+c1.iloc[j,i] for i in range(n-1) for j in range(i+1,n)) == first_k)
+    AP.addConstr(quicksum((c2.iloc[i,j]-c2.iloc[j,i])*y[i,j]+c2.iloc[j,i] for i in range(n-1) for j in range(i+1,n)) == second_k)
 
     AP.update()
     for i in range(n-1):
@@ -265,15 +267,16 @@ def solve_pair_min_tau(D,D2=None,method=["lop","hillside"][1],lazy=False,verbose
     ranking = np.argsort(r)
     perm_y = tuple([int(item) for item in ranking])
     
-    k_x = np.sum(c1*sol_x)
-    k_y = np.sum(c2*sol_y)
+    k_x = np.sum(np.sum(c1*sol_x))
+    k_y = np.sum(np.sum(c2*sol_y))
     
     details = {"obj":AP.objVal,"k_x": k_x, "k_y":k_y, "perm_x":perm_x,"perm_y":perm_y, "x": sol_x,"y":sol_y,"u":sol_u,"v":sol_v}
             
     return AP.objVal,details
     
-def solve_pair_max_tau(D,D2=None,method=["lop","hillside"][1],lazy=False,verbose=True):
-    first_k, first_details = solve(D,method=method,lazy=lazy,verbose=verbose)
+def solve_pair_max_tau(D,D2=None,method=["lop","hillside"][1],lazy=False,verbose=True,cont=False):
+    _, first_details = solve(D,method=method,lazy=lazy,verbose=verbose,cont=cont)
+    first_k = first_details['obj']
     if verbose:
         print('Finished first optimization. Obj:',first_k)
     n = D.shape[0]
@@ -284,7 +287,8 @@ def solve_pair_max_tau(D,D2=None,method=["lop","hillside"][1],lazy=False,verbose
     
     second_k = first_k
     if D2 is not None:
-        second_k, second_details = solve(D2,method=method,lazy=lazy,verbose=verbose)
+        _, second_details = solve(D2,method=method,lazy=lazy,verbose=verbose,cont=cont)
+        second_k = second_details['obj']
     
     if method == 'lop':
         c1 = D
@@ -292,10 +296,10 @@ def solve_pair_max_tau(D,D2=None,method=["lop","hillside"][1],lazy=False,verbose
         if D2 is not None:
             c2 = D2
     elif method == 'hillside':
-        c1 = compute_C(D)
+        c1 = C_count(D)
         c2 = c1
         if D2 is not None:
-            c2 = compute_C(D2)
+            c2 = C_count(D2)
 
     x = {}
     y = {}
@@ -323,8 +327,8 @@ def solve_pair_max_tau(D,D2=None,method=["lop","hillside"][1],lazy=False,verbose
                         cons.setAttr(GRB.Attr.Lazy,1)
     AP.update()
     
-    AP.addConstr(quicksum((c1[i,j]-c1[j,i])*x[i,j]+c1[j,i] for i in range(n-1) for j in range(i+1,n)) == first_k)
-    AP.addConstr(quicksum((c2[i,j]-c2[j,i])*y[i,j]+c2[j,i] for i in range(n-1) for j in range(i+1,n)) == second_k)
+    AP.addConstr(quicksum((c1.iloc[i,j]-c1.iloc[j,i])*x[i,j]+c1.iloc[j,i] for i in range(n-1) for j in range(i+1,n)) == first_k)
+    AP.addConstr(quicksum((c2.iloc[i,j]-c2.iloc[j,i])*y[i,j]+c2.iloc[j,i] for i in range(n-1) for j in range(i+1,n)) == second_k)
 
     AP.update()
     for i in range(n-1):
@@ -359,10 +363,10 @@ def solve_pair_max_tau(D,D2=None,method=["lop","hillside"][1],lazy=False,verbose
     ranking = np.argsort(r)
     perm_y = tuple([int(item) for item in ranking])
     
-    k_x = np.sum(c1*sol_x)
-    k_y = np.sum(c2*sol_y)
+    k_x = np.sum(np.sum(c1*sol_x))
+    k_y = np.sum(np.sum(c2*sol_y))
     
-    details = {"obj":AP.objVal,"k_x": k_x, "k_y":k_y, "perm_x":perm_x,"perm_y":perm_y, "x": sol_x,"y":sol_y,"u":sol_u,"v":sol_v}
+    details = {"obj":AP.objVal,"k_x": k_x, "k_y":k_y, "perm_x":perm_x,"perm_y":perm_y, 'c1': c1, 'c2': c2, "x": sol_x,"y":sol_y,"u":sol_u,"v":sol_v}
             
     return AP.objVal,details
     

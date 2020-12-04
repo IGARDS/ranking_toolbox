@@ -21,6 +21,7 @@ def write_model(AP,model_file=None):
     AP.write(model_file)
     return model_file
 
+"""
 def compute_C(D):
     D = copy.copy(D)
     for i in range(D.shape[0]):
@@ -30,6 +31,7 @@ def compute_C(D):
         for j in range(D.shape[0]):
             c[i,j] = np.count_nonzero(D[:,j]-D[:,i]<0) + np.count_nonzero(D[i,:]-D[j,:]<0) 
     return c
+"""
 
 # I'm not sure this works exactly the same for LOP
 def perm_to_x(perm):
