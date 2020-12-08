@@ -15,8 +15,6 @@ Tim Chartier, Ph.D.<br>
 Department of Mathematics<br>
 Davidson College
 
-TODO: Add in students
-
 ## Acknowledgements
 We would like to thank the entire IGARDS team for their invaluable insight and encouragement.
 
