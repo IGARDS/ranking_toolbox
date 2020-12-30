@@ -11,7 +11,7 @@ fi
 echo "Model file: $MODEL"
 echo "Solutions file: $SOLUTIONS"
 
-scip <<EOF
+~/SCIPOptSuite/bin/scip <<EOF
 read $MODEL
 set presolving maxrounds 0
 set constraints countsols sollimit 500000

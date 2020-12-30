@@ -130,11 +130,18 @@ def calc_con_dis(perm_x,perm_y):
                 ncon += 1
     return ncon, ndis
 
+def tau_to_ndis(tau_val,n):
+    t = nCr(n,2)
+    ndis = (tau_val*t - t)/-2
+    return int(ndis)
+
 def tau(perm_x,perm_y):
     n = len(perm_x)
     ncon,ndis = calc_con_dis(perm_x,perm_y)
-    return (ncon - ndis)/nCr(n,2)
+    return tau_from_ncon_ndis(ncon,ndis,n)
     
+def tau_from_ncon_ndis(ncon,ndis,n):
+    return (ncon - ndis)/nCr(n,2)
 
 def nPr(n,r):
     f = math.factorial

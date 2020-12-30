@@ -61,7 +61,6 @@ def solve(S_orig, c_orig = None, indices = None, method="hillside",num_random_re
             #include_score = np.zeros(S.shape)
             #inxs_num = np.where(~np.isnan(S))
             #include_score[inxs_num] = 1
-            
                 
             if method == 'hillside':
                 c = c_orig[perm_inxs,:][:,perm_inxs]
@@ -114,7 +113,7 @@ def solve(S_orig, c_orig = None, indices = None, method="hillside",num_random_re
                 if method == 'lop':
                     AP.addConstr(quicksum((S[i,j]-S[j,i])*x[i,j]+S[j,i] for i in range(n-1) for j in range(i+1,n)) == first_k)
                 elif method == 'hillside':
-                    AP.setObjective(quicksum((c[i,j]-c[j,i])*x[i,j]+c[j,i] for i in range(n-1) for j in range(i+1,n)),GRB.MINIMIZE)
+                    AP.addConstr(quicksum((c[i,j]-c[j,i])*x[i,j]+c[j,i] for i in range(n-1) for j in range(i+1,n)) == first_k)
 
             tic = time.perf_counter()
             if method == 'lop':
@@ -171,6 +170,12 @@ def solve(S_orig, c_orig = None, indices = None, method="hillside",num_random_re
                 elif method == 'hillside':
                     AP.setObjective(quicksum((c[i,j]-c[j,i])*x[i,j]+c[j,i] for i in range(n-1) for j in range(i+1,n)),GRB.MINIMIZE)
             details = {"Pfirst": Pfirst, "P":Pfinal,"x": xfirst,"objs":objs,"xs":xs}
+            
+            # add the objective as a constraint for scip
+            if method == 'lop':
+                AP.addConstr(quicksum((S[i,j]-S[j,i])*x[i,j]+S[j,i] for i in range(n-1) for j in range(i+1,n)) == AP.objVal)
+            elif method == 'hillside':
+                AP.addConstr(quicksum((c[i,j]-c[j,i])*x[i,j]+c[j,i] for i in range(n-1) for j in range(i+1,n)) == AP.objVal)
             details['model'] = AP
 
             if find_pair:
@@ -252,6 +257,7 @@ def solve(S_orig, c_orig = None, indices = None, method="hillside",num_random_re
         
     details['obj'] = k
     if method == 'hillside':
+        details['c'] = c
         k = round(k)
     elif method == 'lop': # switch to delta
         perm = np.array(Pfirst[0])
@@ -1042,3 +1048,20 @@ def objective_count_exhaustive(D):
     details = {}
     details["P"] = solutions
     return min_value,details
+
+def ranking_from_matrices(matrix,b,inxs=None):
+    try:
+        r = np.linalg.solve(matrix,b)
+    except:
+        r = np.dot(np.linalg.pinv(matrix),b)
+    r = pd.Series(r,index=matrix.columns)
+    if inxs is not None:
+        r=r.iloc[inxs]
+    perm,ranking = perm_ranking_from_r(r)
+    return ranking, r, perm
+
+def perm_ranking_from_r(r):
+    perm = (-r).argsort()
+    ranking = pd.Series(range(len(r)),index=r.sort_values(ascending=False).index)+1
+    ranking = ranking.loc[perm.index]
+    return perm, ranking

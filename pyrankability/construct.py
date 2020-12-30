@@ -45,7 +45,10 @@ def V_count_vectorized(game_df,value_map):
     linked["games"] = linked["game_i_j"].astype(str)+","+linked["game_k_j"].astype(str)
     linked.loc[linked["game_k_j"] < linked["game_i_j"],"games"] = linked["game_k_j"].astype(str)+","+linked["game_i_j"].astype(str)
     linked = linked.drop_duplicates(subset='games', keep='first')
-    return value_map(linked).unstack()
+    Ds = list(value_map(linked))
+    for i in range(len(Ds)):
+        Ds[i] = Ds[i].unstack()
+    return Ds
 
 def map_vectorized(game_df,value_map):
     all_names = list(np.unique(list(game_df["team1_name"])+list(game_df["team2_name"])))
@@ -81,14 +84,14 @@ def C_count(S,threshold=0):
             c[i,j] = np.sum(S[mask1,j]-S[mask1,i]<0) + np.sum(S[i,mask2]-S[j,mask2]<0)
     return pd.DataFrame(c,index=names,columns=names)
 
-def support_map_vectorized_direct_indirect_weighted(linked,direct_thres=1,spread_thres=0,weight_indirect=0.5,verbose=False):
+def support_map_vectorized_direct_indirect(linked,direct_thres=1,spread_thres=np.Inf,verbose=False):
     # columns
     # 'team_j', 'team_i_name', 'team_i_score', 'team_i_H_A_N',
     # 'team_j_i_score', 'team_j_i_H_A_N', 'game_i_j', 'team_k_name',
     # 'team_k_score', 'team_k_H_A_N', 'team_j_k_score', 'team_j_k_H_A_N',
     # 'game_k_j'
     linked["direct"] = linked["game_i_j"] == linked["game_k_j"] #linked["team_i_name"] == linked["team_k_name"]
-    if weight_indirect == 0: # Remove any non-direct
+    if spread_thres == np.Inf: # Remove any non-direct
         linked = linked.loc[linked["direct"]].copy()
     linked["indirect"] = linked["team_i_name"] != linked["team_k_name"]
     # | (linked["team_i_name"] == linked["team_j_k_name"]) | (linked["team_k_name"] == linked["team_j_k_name"])
@@ -105,28 +108,35 @@ def support_map_vectorized_direct_indirect_weighted(linked,direct_thres=1,spread
     # part to modify
     # direct
     d_ik = linked['team_i_score'] - linked['team_j_i_score']
-    support_ik = (linked["direct"] & (d_ik > direct_thres)).astype(int)
-    support_ki = (linked["direct"] & (d_ik < -direct_thres)).astype(int)
+    support_ik = (d_ik > direct_thres)
+    support_ki = (d_ik < -direct_thres)
+    support_ik.loc[~linked['direct']] = np.NaN
+    support_ki.loc[~linked['direct']] = np.NaN
 
     # indirect
-    if weight_indirect > 0:
+    if spread_thres != np.Inf:
         d_ij = linked["team_i_score"] - linked["team_j_i_score"]
         d_kj = linked["team_k_score"] - linked["team_j_k_score"]
 
         # always a positive and it captures that if i beat j by 5 points and k beat j by 2 points then this spread is 3
         spread = np.abs(d_ij - d_kj) 
 
-        support_ik += weight_indirect*((linked["indirect"]) & (d_ij > 0) & (d_kj < 0) & (spread > spread_thres)).astype(int)
-
-        support_ki += weight_indirect*((linked["indirect"]) & (d_kj > 0) & (d_ij < 0) & (spread > spread_thres)).astype(int)
+        indirect_support_ik = ((d_ij > 0) & (d_kj < 0) & (spread > spread_thres))
+        indirect_support_ki = ((d_kj > 0) & (d_ij < 0) & (spread > spread_thres))
+        
+        indirect_support_ik.loc[~linked['indirect']] = np.NaN
+        indirect_support_ki.loc[~linked['indirect']] = np.NaN
     
     # end part to modify
     #######################################    
     linked["support_ik"]=support_ik
-    linked["index_ik"]=index_ik
     linked["support_ki"]=support_ki
+    if spread_thres != np.Inf:
+        linked["indirect_support_ik"]=indirect_support_ik
+        linked["indirect_support_ki"]=indirect_support_ki
+    linked["index_ik"]=index_ik
     linked["index_ki"]=index_ki
-        
+            
     if verbose:
         print('Direct')
         print("Total:",sum(linked["direct"] & (linked["support_ik"]>0)) + sum(linked["direct"] & (linked["support_ki"]>0)),
@@ -146,11 +156,24 @@ def support_map_vectorized_direct_indirect_weighted(linked,direct_thres=1,spread
     ret1 = linked.set_index(index_ik)["support_ik"]
     ret2 = linked.set_index(index_ki)["support_ki"]
     ret = ret1.append(ret2)
-    ret = ret.groupby(level=[0,1]).sum()
-    return ret
+    ret = ret.groupby(level=[0,1]).sum().astype(int)
+    # just look up if there are any direct games between them and set to NaN if not
+    counts = linked.set_index(index_ik)["direct"].append(linked.set_index(index_ki)["direct"]).groupby(level=[0,1]).sum().astype(int)
+    ret.loc[~(counts > 0)] = np.NaN
+    
+    if spread_thres == np.Inf:
+        return ret,
+    else:
+        ret1 = linked.set_index(index_ik)["indirect_support_ik"]
+        ret2 = linked.set_index(index_ki)["indirect_support_ki"]
+        indirect_ret = ret1.append(ret2)
+        indirect_ret = indirect_ret.groupby(level=[0,1]).sum().astype(int)
+        counts = linked.set_index(index_ik)["indirect"].append(linked.set_index(index_ki)["indirect"]).groupby(level=[0,1]).sum().astype(int)
+        indirect_ret.loc[~(counts > 0)] = np.NaN
+        return ret,indirect_ret
 
 
-def colley_matrices(linked,direct_thres=1,spread_thres=0,weight_indirect=0.5,verbose=False,reordering=None):
+def colley_matrices(linked,direct_thres=1,spread_thres=0,verbose=False,reordering=None):
     # columns
     # 'team_j', 'team_i_name', 'team_i_score', 'team_i_H_A_N',
     # 'team_j_i_score', 'team_j_i_H_A_N', 'game_i_j', 'team_k_name',
@@ -188,14 +211,14 @@ def colley_matrices(linked,direct_thres=1,spread_thres=0,weight_indirect=0.5,ver
     spread = np.abs(d_ij - d_kj) 
 
     # again seems like the thresholds don't matter here
-    gameWeight += weight_indirect*((linked["indirect"]) & (d_ij > 0) & (d_kj < 0) & (spread > 0)).astype(int)    
-    gameWeight += weight_indirect*((linked["indirect"]) & (d_kj > 0) & (d_ij < 0) & (spread > 0)).astype(int)
+    indirect_gameWeight = ((linked["indirect"]) & (d_ij > 0) & (d_kj < 0) & (spread > 0)).astype(int)    
+    indirect_gameWeight += ((linked["indirect"]) & (d_kj > 0) & (d_ij < 0) & (spread > 0)).astype(int)
     
-    support_ik += 1/2*weight_indirect*((linked["indirect"]) & (d_ij > 0) & (d_kj < 0) & (spread > spread_thres)).astype(int)    
-    support_ki += 1/2*weight_indirect*((linked["indirect"]) & (d_kj > 0) & (d_ij < 0) & (spread > spread_thres)).astype(int)
+    indirect_support_ik = 1/2*((linked["indirect"]) & (d_ij > 0) & (d_kj < 0) & (spread > spread_thres)).astype(int)    
+    indirect_support_ki = 1/2*((linked["indirect"]) & (d_kj > 0) & (d_ij < 0) & (spread > spread_thres)).astype(int)
     
-    penalty_ik += -1/2*weight_indirect*((linked["indirect"]) & (d_ij > 0) & (d_kj < 0) & (spread > spread_thres)).astype(int)    
-    penalty_ki += -1/2*weight_indirect*((linked["indirect"]) & (d_kj > 0) & (d_ij < 0) & (spread > spread_thres)).astype(int)
+    indirect_penalty_ik = -1/2*((linked["indirect"]) & (d_ij < 0) & (d_kj > 0) & (spread > spread_thres)).astype(int)    
+    indirect_penalty_ki = -1/2*((linked["indirect"]) & (d_kj < 0) & (d_ij > 0) & (spread > spread_thres)).astype(int)
     
     # end part to modify
     #######################################    
@@ -203,10 +226,16 @@ def colley_matrices(linked,direct_thres=1,spread_thres=0,weight_indirect=0.5,ver
     linked["support_ki"]=support_ki
     linked["penalty_ik"]=penalty_ik
     linked["penalty_ki"]=penalty_ki
+    linked["indirect_support_ik"]=indirect_support_ik
+    linked["indirect_support_ki"]=indirect_support_ki
+    linked["indirect_penalty_ik"]=indirect_penalty_ik
+    linked["indirect_penalty_ki"]=indirect_penalty_ki
     linked["index_ik"]=index_ik
     linked["index_ki"]=index_ki
     linked["gameWeight"]=gameWeight
+    linked["indirect_gameWeight"]=indirect_gameWeight
 
+    # Direct
     ret1 = linked.set_index(index_ik)["gameWeight"]
     ret2 = linked.set_index(index_ki)["gameWeight"]
     ret = ret1.append(ret2)
@@ -220,13 +249,30 @@ def colley_matrices(linked,direct_thres=1,spread_thres=0,weight_indirect=0.5,ver
     ret = ret.groupby(level=[0,1]).sum()
     b = ret.unstack().sum(axis=1)
     
+    # Indirect
+    ret1 = linked.set_index(index_ik)["indirect_gameWeight"]
+    ret2 = linked.set_index(index_ki)["indirect_gameWeight"]
+    ret = ret1.append(ret2)
+    indirect_colleyMatrix = -ret.groupby(level=[0,1]).sum()
+    indirect_colleyMatrix = indirect_colleyMatrix.unstack()
+    indirect_colleyMatrix.values[np.diag_indices(len(indirect_colleyMatrix))] = -indirect_colleyMatrix.sum()+2 # ask tim about this plus 2
+ 
+    ret1 = linked.set_index(index_ik)["indirect_support_ik"]+linked.set_index(index_ik)["indirect_penalty_ik"]
+    ret2 = linked.set_index(index_ki)["indirect_support_ki"]+linked.set_index(index_ki)["indirect_penalty_ki"]
+    ret = ret1.append(ret2)
+    ret = ret.groupby(level=[0,1]).sum()
+    indirect_b = ret.unstack().sum(axis=1)
+    
     if reordering is not None:
         colleyMatrix = colleyMatrix.loc[reordering,reordering]
         b = b.loc[reordering]
+        
+        indirect_colleyMatrix = indirect_colleyMatrix.loc[reordering,reordering]
+        indirect_b = indirect_b.loc[reordering]
     
-    return colleyMatrix,b
+    return colleyMatrix,b,indirect_colleyMatrix,indirect_b
 
-def massey_matrices(linked,direct_thres=1,spread_thres=0,weight_indirect=0.5,verbose=False,reordering=None):
+def massey_matrices(linked,direct_thres=1,spread_thres=0,verbose=False,reordering=None):
     # columns
     # 'team_j', 'team_i_name', 'team_i_score', 'team_i_H_A_N',
     # 'team_j_i_score', 'team_j_i_H_A_N', 'game_i_j', 'team_k_name',
@@ -255,7 +301,7 @@ def massey_matrices(linked,direct_thres=1,spread_thres=0,weight_indirect=0.5,ver
 
     penalty_ik = -np.abs(d_ik)*(linked["direct"] & (d_ik < direct_thres)).astype(int)
     penalty_ki = -np.abs(d_ik)*(linked["direct"] & (d_ik > -direct_thres)).astype(int)
-    
+        
     # indirect
     d_ij = linked["team_i_score"] - linked["team_j_i_score"]
     d_kj = linked["team_k_score"] - linked["team_j_k_score"]
@@ -263,26 +309,31 @@ def massey_matrices(linked,direct_thres=1,spread_thres=0,weight_indirect=0.5,ver
     # always a positive and it captures that if i beat j by 5 points and k beat j by 2 points then this spread is 3
     spread = np.abs(d_ij - d_kj) 
     
-    # again seems like the thresholds don't matter here
-    gameWeight += weight_indirect*((linked["indirect"]) & (d_ij > 0) & (d_kj < 0) & (spread > 0)).astype(int)    
-    gameWeight += weight_indirect*((linked["indirect"]) & (d_kj > 0) & (d_ij < 0) & (spread > 0)).astype(int)
+    indirect_gameWeight = ((linked["indirect"]) & (d_ij > 0) & (d_kj < 0) & (spread > 0)).astype(int)    
+    indirect_gameWeight += ((linked["indirect"]) & (d_kj > 0) & (d_ij < 0) & (spread > 0)).astype(int)
     
-    support_ik += spread*weight_indirect*((linked["indirect"]) & (d_ij > 0) & (d_kj < 0) & (spread > spread_thres)).astype(int)    
-    support_ki += spread*weight_indirect*((linked["indirect"]) & (d_kj > 0) & (d_ij < 0) & (spread > spread_thres)).astype(int)
+    indirect_support_ik = spread*((linked["indirect"]) & (d_ij > 0) & (d_kj < 0) & (spread > spread_thres)).astype(int)    
+    indirect_support_ki = spread*((linked["indirect"]) & (d_kj > 0) & (d_ij < 0) & (spread > spread_thres)).astype(int)
     
-    penalty_ik += -spread*weight_indirect*((linked["indirect"]) & (d_ij > 0) & (d_kj < 0) & (spread > spread_thres)).astype(int)    
-    penalty_ki += -spread*weight_indirect*((linked["indirect"]) & (d_kj > 0) & (d_ij < 0) & (spread > spread_thres)).astype(int)
-    
+    indirect_penalty_ik = -spread*((linked["indirect"]) & (d_ij < 0) & (d_kj > 0) & (spread > spread_thres)).astype(int)    
+    indirect_penalty_ki = -spread*((linked["indirect"]) & (d_kj < 0) & (d_ij > 0) & (spread > spread_thres)).astype(int)
+        
     # end part to modify
     #######################################    
     linked["support_ik"]=support_ik
     linked["support_ki"]=support_ki
     linked["penalty_ik"]=penalty_ik
     linked["penalty_ki"]=penalty_ki
+    linked["indirect_support_ik"]=indirect_support_ik
+    linked["indirect_support_ki"]=indirect_support_ki
+    linked["indirect_penalty_ik"]=indirect_penalty_ik
+    linked["indirect_penalty_ki"]=indirect_penalty_ki
     linked["index_ik"]=index_ik
     linked["index_ki"]=index_ki
     linked["gameWeight"]=gameWeight
+    linked["indirect_gameWeight"]=indirect_gameWeight
 
+    # Direct
     ret1 = linked.set_index(index_ik)["gameWeight"]
     ret2 = linked.set_index(index_ki)["gameWeight"]
     ret = ret1.append(ret2)
@@ -295,25 +346,33 @@ def massey_matrices(linked,direct_thres=1,spread_thres=0,weight_indirect=0.5,ver
     ret = ret1.append(ret2)
     ret = ret.groupby(level=[0,1]).sum()
     b = ret.unstack().sum(axis=1)
-    
+        
+    # Indirect
+    ret1 = linked.set_index(index_ik)["indirect_gameWeight"]
+    ret2 = linked.set_index(index_ki)["indirect_gameWeight"]
+    ret = ret1.append(ret2)
+    indirect_masseyMatrix = -ret.groupby(level=[0,1]).sum()
+    indirect_masseyMatrix = indirect_masseyMatrix.unstack()
+    indirect_masseyMatrix.values[np.diag_indices(len(indirect_masseyMatrix))] = -indirect_masseyMatrix.sum()
+
+    ret1 = linked.set_index(index_ik)["indirect_support_ik"]+linked.set_index(index_ik)["indirect_penalty_ik"]
+    ret2 = linked.set_index(index_ki)["indirect_support_ki"]+linked.set_index(index_ki)["indirect_penalty_ki"]
+    ret = ret1.append(ret2)
+    ret = ret.groupby(level=[0,1]).sum()
+    indirect_b = ret.unstack().sum(axis=1)
+            
     if reordering is not None:
         masseyMatrix = masseyMatrix.loc[reordering,reordering]
         b = b.loc[reordering]
         
+        indirect_masseyMatrix = indirect_masseyMatrix.loc[reordering,reordering]
+        indirect_b = indirect_b.loc[reordering]
+        
     masseyMatrix.values[-1,:] = np.ones((1,len(masseyMatrix)))
     b.values[-1] = 0
     
-    return masseyMatrix,b
-
-def ranking_from_matrices(matrix,b,inxs):
-    try:
-        r = np.linalg.solve(matrix,b)
-    except:
-        r = np.dot(np.linalg.pinv(matrix),b)
-    r=list(r)
-    for ix in inxs:
-        r.insert(ix,-np.Inf)
-    r=np.array(r)
-    iSort = np.argsort(-r)
-    return iSort, r
+    indirect_masseyMatrix.values[-1,:] = np.ones((1,len(indirect_masseyMatrix)))
+    indirect_b.values[-1] = 0
+    
+    return masseyMatrix,b,indirect_masseyMatrix,indirect_b
 

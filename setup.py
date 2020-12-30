@@ -2,7 +2,7 @@ import setuptools
 
 setuptools.setup(
     name="pyrankability",
-    version="0.0.11",
+    version="0.1.0",
     author="Paul Anderson",
     author_email="pauleanderson@gmail.com",
     description="Rankability Toolbox",

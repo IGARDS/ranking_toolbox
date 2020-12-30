@@ -37,7 +37,7 @@ def AB_to_P2(A,B):
     P2 = pd.DataFrame(np.array([A,B]))
     return P2
 
-def spider(P2,file=None,fig_format="PNG",width=5,height=10):
+def spider(P2,file=None,fig_format="PNG",width=5,height=10,font_size=8):
     """
     from pyrankability.plot import spider, AB_to_P2
 
@@ -56,10 +56,12 @@ def spider(P2,file=None,fig_format="PNG",width=5,height=10):
     y1 = []
     y2 = []
     y = []
-    index = []
+    index = [] 
     for i in range(P2.shape[1]):
-        name1 = "A%d:%d"%(i+1,P2.iloc[0,i])
-        name2 = "B%d:%d"%(i+1,P2.iloc[1,i])
+        v = str(i+1)
+        name1 = f"A{v}:{P2.iloc[0,i]}"
+        name2 = f"B{v}:{P2.iloc[1,i]}"
+        #name2 = "B%d:%d"%(i+1,P2.iloc[1,i])
         G.add_node(name1)
         G.add_node(name2)
         loc = 1-buffer-(i*step)
@@ -76,13 +78,17 @@ def spider(P2,file=None,fig_format="PNG",width=5,height=10):
     y=pd.Series(y,index=index)
 
     for i in range(P2.shape[1]):
-        name1 = "A%d:%d"%(i+1,P2.iloc[0,i])
-        ix = np.where(P2.iloc[1,:] == P2.iloc[0,i])[0]
-        name2 = "B%d:%d"%(ix+1,P2.iloc[0,i])
+        v=str(i+1)
+        name1 = f"A{v}:{P2.iloc[0,i]}"
+        #name1 = "A%d:%d"%(i+1,P2.iloc[0,i])
+        ix = np.where(P2.iloc[1,:] == P2.iloc[0,i])[0][0]
+        v=str(ix+1)
+        name2 = f"B{v}:{P2.iloc[0,i]}"
+        #name2 = "B%d:%d"%(ix+1,P2.iloc[0,i])
         G.add_edge(name1, name2)
     edges = G.edges()
 
-    nx.draw_networkx_labels(G,pos=pos,labels=labels)
+    nx.draw_networkx_labels(G,pos=pos,labels=labels,font_size=font_size)
 
     color_map = y.map({"A":"white","B":"white"})
     nx.draw(G, pos, node_color=color_map)
@@ -161,7 +167,7 @@ def show_score_xstar(xstars,indices=None,group_label="Group",fixed_r=None,resolv
     )
     return g,score_df,ordered_xstars
 
-def show_score_xstar2(xstars,indices=None,group_label="Group",fixed_r=None,resolve_scale=False,columns=1,width=300,height=300):
+def show_score_xstar2(xstars,indices=None,group_label="Group",fixed_r=None,resolve_scale=False,columns=1,width=300,height=300,labelFontSize=12):
     all_df = pd.DataFrame(columns=["i","j","x",group_label,"ri","rj"])
     score_df = pd.DataFrame(columns=["num_frac_xstar_upper","num_one_xstar_upper","num_zero_xstar_upper"])
     score_df.index.name = group_label
@@ -220,7 +226,7 @@ def show_score_xstar2(xstars,indices=None,group_label="Group",fixed_r=None,resol
         width=width,
         height=height
     ).facet(
-        facet=alt.Column(title=None,field=alt.Field(group_label),type='nominal',header=alt.Header(labelFontSize=50,labelOrient='bottom')),
+        facet=alt.Column(title=None,field=alt.Field(group_label),type='nominal',header=alt.Header(labelFontSize=labelFontSize,labelOrient='bottom')),
         #alt.Column("%s:N"%group_label, title=,header=alt.Header(labelBaseline="bottom")),
         columns=columns
     ).configure_axis(
