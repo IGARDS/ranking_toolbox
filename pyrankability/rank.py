@@ -302,7 +302,7 @@ def solve_exhaustive_error(D_orig,max_error=0,min_error=0,method=["lop","hillsid
                 details['P'].extend(solutions[k-error])
                 details['objs'].extend([k-error for i in range(len(solutions[k-error]))])
     return k,details
-    
+
 def objective_lop(Dorig,perm):
     D = Dorig[np.ix_(perm,perm)]
     return np.sum(np.sum(np.triu(D)))

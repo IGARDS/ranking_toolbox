@@ -496,3 +496,46 @@ def solve_pair_tau_range(tau_range,D,D2=None,method=["lop","hillside"][1],lazy=F
     details = {"obj":AP.objVal,"tau":tau,"ncon":ncon,"ndis":ndis,"k_x": k_x, "k_y":k_y, "perm_x":perm_x,"perm_y":perm_y, 'c1': c1, 'c2': c2, "x": sol_x,"y":sol_y,"u":sol_u,"v":sol_v}
             
     return AP.objVal,details
+
+def collect(D_or_C,model,opt_k):
+    #model = details_lop_with_models['model']
+    model_file = common.write_model(model)
+    solution_file = model_file + ".solutions"
+    r1 = os.system(f"sed -i '/^OBJSENS/d' {model_file}")
+    if r1 != 0:
+        raise Exception("Unknown error in [1]")
+    this_dir = os.path.dirname(os.path.abspath(__file__))
+    r2 = os.system(f'{this_dir}/../collect.sh {model_file} {solution_file}')
+    if r2 != 0:
+        raise Exception("Unknown error in [2]")
+
+    solutions = pd.read_csv(solution_file,sep=', ')
+    x_columns = solutions.columns[1:-1]
+    xs = []
+    a,b,c = 1,1,-2*len(x_columns)
+    n = int((-b + np.sqrt(b**2 - 4*a*c))/(2*a) + 1)
+    xstar = np.zeros((n,n))
+    objs = []
+    s = 0
+    for k in range(solutions.shape[0]):
+        x = np.zeros((n,n))
+        for c in x_columns:
+            ij_str = c.replace("x(","").replace(")","")
+            i,j = ij_str.split(",")
+            i,j = int(i),int(j)
+            x[i,j] = solutions.loc[k,c]
+            x[j,i] = 1 - x[i,j]
+        obj = np.sum(np.sum(D_or_C*x))
+        xs.append(x)
+        objs.append(obj)
+        error = obj - opt_k
+        xstar += x
+    xstar = xstar/solutions.shape[0]
+
+    perms = []
+    for x in xs:
+        r = np.sum(x,axis=0)
+        perm = np.argsort(r)
+        perms.append(perm)
+        
+    return perms, xs, xstar
