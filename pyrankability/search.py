@@ -15,9 +15,228 @@ from .rank import *
 
 from . import common
 
-# TODO: change all solve returns to use obj instead of k
+def solve_outlier(D,orig_obj,orig_sol_x,method=["lop","hillside"][1],lazy=False,verbose=False) :
+    n = D.shape[0]
+    AP = Model(method)
+    
+    if method == 'hillside':
+        c = C_count(D)
 
-def solve_max_tau(D,orig_k,orig_sol_x,method=["lop","hillside"][1],lazy=False,verbose=False) :
+    x = {}
+
+    for i in range(n-1):
+        for j in range(i+1,n):
+            x[i,j] = AP.addVar(lb=0,vtype=GRB.BINARY,ub=1,name="x(%s,%s)"%(i,j)) #binary
+
+    AP.update()
+    for i in range(n):
+        for j in range(i+1,n):
+            for k in range(j+1,n):
+                trans_cons = []
+                trans_cons.append(AP.addConstr(x[i,j] + x[j,k] - x[i,k] <= 1))
+                trans_cons.append(AP.addConstr(x[i,j] + x[j,k] - x[i,k] >= 0))
+                if lazy:
+                    for cons in trans_cons:
+                        cons.setAttr(GRB.Attr.Lazy,1)
+
+    AP.update()
+    if method == 'lop':
+        AP.addConstr(quicksum((D.iloc[i,j]-D.iloc[j,i])*x[i,j]+D.iloc[j,i] for i in range(n-1) for j in range(i+1,n))==orig_obj)
+    elif method == 'hillside':
+        AP.addConstr(quicksum((c.iloc[i,j]-c.iloc[j,i])*x[i,j]+c.iloc[j,i] for i in range(n-1) for j in range(i+1,n))==orig_obj)                
+    AP.update()
+    
+    ij_1 = []
+    ij_0 = []
+    for i in range(n-1):
+        for j in range(i+1,n):
+            if orig_sol_x[i,j] == 1:
+                ij_1.append((i,j))
+            else:
+                ij_0.append((i,j))
+    AP.addConstr(quicksum(x[i,j]-orig_sol_x[i,j] for i,j in ij_0)+quicksum(orig_sol_x[i,j] - x[i,j] for i,j in ij_1) >= 1)                
+    AP.update()
+
+    AP.setParam( 'OutputFlag', verbose )
+    AP.update()
+
+    if verbose:
+        print('Start pair optimization')
+    tic = time.perf_counter()
+    AP.optimize()
+    toc = time.perf_counter()
+    if verbose:
+        print(f"Optimization in {toc - tic:0.4f} seconds")
+        print('End optimization')
+
+    sol_x = get_sol_x_by_x(x,n)()
+    r = np.sum(sol_x,axis=0)
+    ranking = np.argsort(r)
+    perm = tuple([int(item) for item in ranking])
+    
+    details = {"obj":AP.objVal,"perm":perm,"x":sol_x}
+    if method == 'hillside':
+        details['c'] = c
+        k = round(k)
+    elif method == 'lop': # switch to delta
+        Dre = D.values[perm,:][:,perm]
+        #print(k,np.sum(np.triu(Dre)))
+        k = np.sum(np.tril(Dre,k=-1))
+        
+    return k,details
+
+
+def solve_any_diff(D,orig_obj,orig_sol_x,method=["lop","hillside"][1],lazy=False,verbose=False) :
+    n = D.shape[0]
+    AP = Model(method)
+    
+    if method == 'hillside':
+        c = C_count(D)
+
+    x = {}
+
+    for i in range(n-1):
+        for j in range(i+1,n):
+            x[i,j] = AP.addVar(lb=0,vtype=GRB.BINARY,ub=1,name="x(%s,%s)"%(i,j)) #binary
+
+    AP.update()
+    for i in range(n):
+        for j in range(i+1,n):
+            for k in range(j+1,n):
+                trans_cons = []
+                trans_cons.append(AP.addConstr(x[i,j] + x[j,k] - x[i,k] <= 1))
+                trans_cons.append(AP.addConstr(x[i,j] + x[j,k] - x[i,k] >= 0))
+                if lazy:
+                    for cons in trans_cons:
+                        cons.setAttr(GRB.Attr.Lazy,1)
+
+    AP.update()
+    if method == 'lop':
+        AP.addConstr(quicksum((D.iloc[i,j]-D.iloc[j,i])*x[i,j]+D.iloc[j,i] for i in range(n-1) for j in range(i+1,n))==orig_obj)
+    elif method == 'hillside':
+        AP.addConstr(quicksum((c.iloc[i,j]-c.iloc[j,i])*x[i,j]+c.iloc[j,i] for i in range(n-1) for j in range(i+1,n))==orig_obj)                
+    AP.update()
+    
+    ij_1 = []
+    ij_0 = []
+    for i in range(n-1):
+        for j in range(i+1,n):
+            if orig_sol_x[i,j] == 1:
+                ij_1.append((i,j))
+            else:
+                ij_0.append((i,j))
+    AP.addConstr(quicksum(x[i,j]-orig_sol_x[i,j] for i,j in ij_0)+quicksum(orig_sol_x[i,j] - x[i,j] for i,j in ij_1) >= 1)                
+    AP.update()
+
+    AP.setParam( 'OutputFlag', verbose )
+    AP.update()
+
+    if verbose:
+        print('Start pair optimization')
+    tic = time.perf_counter()
+    AP.optimize()
+    toc = time.perf_counter()
+    if verbose:
+        print(f"Optimization in {toc - tic:0.4f} seconds")
+        print('End optimization')
+
+    sol_x = get_sol_x_by_x(x,n)()
+    r = np.sum(sol_x,axis=0)
+    ranking = np.argsort(r)
+    perm = tuple([int(item) for item in ranking])
+    
+    details = {"obj":AP.objVal,"perm":perm,"x":sol_x}
+    if method == 'hillside':
+        details['c'] = c
+        k = round(k)
+    elif method == 'lop': # switch to delta
+        Dre = D.values[perm,:][:,perm]
+        #print(k,np.sum(np.triu(Dre)))
+        k = np.sum(np.tril(Dre,k=-1))
+        
+    return k,details
+
+def solve_fixed_binary_x(D,orig_k,orig_sol_x,minimize=False,method=["lop","hillside"][1],lazy=False,verbose=False) :
+    n = D.shape[0]
+    AP = Model(method)
+    
+    if method == 'hillside':
+        c = C_count(D)
+
+    x = {}
+
+    for i in range(n-1):
+        for j in range(i+1,n):
+            x[i,j] = AP.addVar(lb=0,vtype=GRB.BINARY,ub=1,name="x(%s,%s)"%(i,j)) #binary
+
+    AP.update()
+    for i in range(n):
+        for j in range(i+1,n):
+            for k in range(j+1,n):
+                trans_cons = []
+                trans_cons.append(AP.addConstr(x[i,j] + x[j,k] - x[i,k] <= 1))
+                trans_cons.append(AP.addConstr(x[i,j] + x[j,k] - x[i,k] >= 0))
+                if lazy:
+                    for cons in trans_cons:
+                        cons.setAttr(GRB.Attr.Lazy,1)
+
+    AP.update()
+    if method == 'lop':
+        AP.addConstr(quicksum((D.iloc[i,j]-D.iloc[j,i])*x[i,j]+D.iloc[j,i] for i in range(n-1) for j in range(i+1,n))==orig_k)
+    elif method == 'hillside':
+        AP.addConstr(quicksum((c.iloc[i,j]-c.iloc[j,i])*x[i,j]+c.iloc[j,i] for i in range(n-1) for j in range(i+1,n))==orig_k)                
+    AP.update()
+    
+    u={}
+    v={}
+    b={}
+    for i in range(n-1):
+        for j in range(i+1,n):
+            u[i,j] = AP.addVar(name="u(%s,%s)"%(i,j),vtype=GRB.BINARY)
+            v[i,j] = AP.addVar(name="v(%s,%s)"%(i,j),vtype=GRB.BINARY)
+    AP.update()
+    for i in range(n-1):
+        for j in range(i+1,n):
+            AP.addConstr(u[i,j] - v[i,j] == x[i,j] - orig_sol_x[i,j])
+            AP.addConstr(u[i,j] + v[i,j] <= 1)
+    AP.update()
+
+    if not minimize:
+        AP.setObjective(quicksum(u[i,j]+v[i,j] for i in range(n-1) for j in range(i+1,n)),GRB.MAXIMIZE)
+    else:
+        AP.setObjective(quicksum(u[i,j]+v[i,j] for i in range(n-1) for j in range(i+1,n)),GRB.MINIMIZE)
+    AP.setParam( 'OutputFlag', verbose )
+    AP.update()
+
+    if verbose:
+        print('Start pair optimization')
+    tic = time.perf_counter()
+    AP.optimize()
+    toc = time.perf_counter()
+    if verbose:
+        print(f"Optimization in {toc - tic:0.4f} seconds")
+        print('End optimization')
+
+    sol_x = get_sol_x_by_x(x,n)()
+    sol_u = get_sol_x_by_x(u,n)()
+    sol_v = get_sol_x_by_x(v,n)()
+    r = np.sum(sol_x,axis=0)
+    ranking = np.argsort(r)
+    perm = tuple([int(item) for item in ranking])
+    details = {"obj":AP.objVal,"perm":perm,"x":sol_x}
+    if method == 'hillside':
+        details['c'] = c
+        k = round(k)
+    elif method == 'lop': # switch to delta
+        Dre = D.values[perm,:][:,perm]
+        #print(k,np.sum(np.triu(Dre)))
+        k = np.sum(np.tril(Dre,k=-1))
+        
+    return k,details
+
+
+
+def solve_fixed_cont_x(D,orig_k,orig_sol_x,minimize=False,method=["lop","hillside"][1],lazy=False,verbose=False) :
     n = D.shape[0]
     AP = Model(method)
     
@@ -64,7 +283,10 @@ def solve_max_tau(D,orig_k,orig_sol_x,method=["lop","hillside"][1],lazy=False,ve
             AP.addConstr(v[i,j] <= 1 - b[i,j])
     AP.update()
 
-    AP.setObjective(quicksum(u[i,j]+v[i,j] for i in range(n-1) for j in range(i+1,n)),GRB.MAXIMIZE)
+    if not minimize:
+        AP.setObjective(quicksum(u[i,j]+v[i,j] for i in range(n-1) for j in range(i+1,n)),GRB.MAXIMIZE)
+    else:
+        AP.setObjective(quicksum(u[i,j]+v[i,j] for i in range(n-1) for j in range(i+1,n)),GRB.MINIMIZE)
     AP.setParam( 'OutputFlag', verbose )
     AP.update()
 
@@ -83,15 +305,16 @@ def solve_max_tau(D,orig_k,orig_sol_x,method=["lop","hillside"][1],lazy=False,ve
     r = np.sum(sol_x,axis=0)
     ranking = np.argsort(r)
     perm = tuple([int(item) for item in ranking])
-    #perm = tuple(perm_inxs[np.array(key)])
-    #reorder = np.argsort(perm_inxs)
-    if method == 'lop':
-        k = np.sum(np.sum(D*sol_x))
-    elif method == 'hillside':
-        k = np.sum(np.sum(c*sol_x))
+    details = {"obj":AP.objVal,"perm":perm,"x":sol_x}
+    if method == 'hillside':
+        details['c'] = c
+        k = round(k)
+    elif method == 'lop': # switch to delta
+        Dre = D.values[perm,:][:,perm]
+        #print(k,np.sum(np.triu(Dre)))
+        k = np.sum(np.tril(Dre,k=-1))
         
-    details = {"obj":k,"perm":perm,"x":sol_x,"u":sol_u,"v":sol_v}
-    return AP.objVal,details
+    return k,details
 
 def bilp_max_tau_jonad(D,lazy=False,verbose=True):
     first_k, first_details = solve(D,method='lop',lazy=lazy,verbose=verbose)
@@ -177,7 +400,7 @@ def bilp_max_tau_jonad(D,lazy=False,verbose=True):
             
     return first_k,details
 
-def solve_pair_min_tau(D,D2=None,method=["lop","hillside"][1],lazy=False,verbose=True,min_dis=1):
+def solve_pair_max_tau(D,D2=None,method=["lop","hillside"][1],lazy=False,verbose=True,min_dis=1):
     first_k, first_details = solve(D,method=method,lazy=lazy,verbose=verbose)
     if verbose:
         print('Finished first optimization. Obj:',first_k)
@@ -274,7 +497,7 @@ def solve_pair_min_tau(D,D2=None,method=["lop","hillside"][1],lazy=False,verbose
             
     return AP.objVal,details
     
-def solve_pair_max_tau(D,D2=None,method=["lop","hillside"][1],lazy=False,verbose=True,cont=False,tau_range=None):
+def solve_pair_min_tau(D,D2=None,method=["lop","hillside"][1],lazy=False,verbose=True,cont=False,tau_range=None):
     if tau_range is not None:
         ndis_thres1 = common.tau_to_ndis(tau_range[0],len(D))
         ndis_thres2 = common.tau_to_ndis(tau_range[1],len(D))

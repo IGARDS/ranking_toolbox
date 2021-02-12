@@ -33,11 +33,10 @@ def compute_C(D):
     return c
 """
 
-# I'm not sure this works exactly the same for LOP
 def perm_to_x(perm):
     x = np.triu(np.ones((len(perm),len(perm))),1)
     order = np.argsort(np.array(perm))
-    x = 1-x[np.ix_(order,order)]
+    x = x[np.ix_(order,order)]
     return x
 
 def get_sol_x_by_x(x,n,cont=False):
@@ -139,7 +138,7 @@ def tau(perm_x,perm_y):
     n = len(perm_x)
     ncon,ndis = calc_con_dis(perm_x,perm_y)
     return tau_from_ncon_ndis(ncon,ndis,n)
-    
+
 def tau_from_ncon_ndis(ncon,ndis,n):
     return (ncon - ndis)/nCr(n,2)
 

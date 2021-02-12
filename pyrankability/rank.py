@@ -17,7 +17,7 @@ from .construct import *
 
 solve_methods = ["lop","hillside"]
 
-def solve(S_orig, c_orig = None, indices = None, method="hillside",num_random_restarts=0,lazy=False,verbose=False,find_pair=False,cont=False,include_model=False):
+def solve(S_orig, c_orig = None, fix_x = {}, method="hillside",num_random_restarts=0,lazy=False,verbose=False,find_pair=False,cont=False,include_model=False):
     if method not in solve_methods:
         raise Exception(f"Method '{method}' not implemented")
     
@@ -28,9 +28,7 @@ def solve(S_orig, c_orig = None, indices = None, method="hillside",num_random_re
     
     temp_dir = tempfile.mkdtemp(dir="/dev/shm") # try to write this model to memory
     
-    if indices is None:
-        indices = list(range(n))
-    sorted(indices)
+    indices = list(range(n))
     
     if method == 'hillside':
         if c_orig is None:
@@ -77,22 +75,14 @@ def solve(S_orig, c_orig = None, indices = None, method="hillside",num_random_re
 
                 x = {}
 
-                nvars = 0
-                indices_hash = {}
-                for iix,i in enumerate(indices):
-                    indices_hash[i] = True
                 for i in range(n-1):
                     for j in range(i+1,n):
-                        if i in indices_hash and j in indices_hash:
-                            if cont == True:
-                                x[i,j] = AP.addVar(lb=0,vtype="C",ub=1,name="x(%s,%s)"%(i,j)) #continuous
-                            else:
-                                x[i,j] = AP.addVar(lb=0,vtype=GRB.BINARY,ub=1,name="x(%s,%s)"%(i,j)) #binary
-                        elif i in indices_hash:
-                            x[i,j] = 1
+                        if (i,j) in fix_x:
+                            x[i,j] = fix_x[i,j]
+                        elif cont == True:
+                            x[i,j] = AP.addVar(lb=0,vtype="C",ub=1,name="x(%s,%s)"%(i,j)) #continuous
                         else:
-                            x[i,j] = 0
-                        nvars += 1
+                            x[i,j] = AP.addVar(lb=0,vtype=GRB.BINARY,ub=1,name="x(%s,%s)"%(i,j)) #binary
 
                 AP.update()
                 ncons = 0
