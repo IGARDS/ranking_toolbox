@@ -339,7 +339,9 @@ def solve_pair(D,D2=None,method=["lop","hillside"][1],minimize=False,min_ndis=No
         ndis_thres1 = common.tau_to_ndis(tau_range[0],len(D))
         ndis_thres2 = common.tau_to_ndis(tau_range[1],len(D)) 
         
-    first_k, first_details = solve(D,method=method,lazy=lazy,verbose=verbose)
+    #import pdb; pdb.set_trace()
+    delta1, first_details = solve(D,method=method,lazy=lazy,verbose=verbose)
+    first_k = first_details['obj']
     if verbose:
         print('Finished first optimization. Obj:',first_k)
         
@@ -351,7 +353,8 @@ def solve_pair(D,D2=None,method=["lop","hillside"][1],minimize=False,min_ndis=No
     
     second_k = first_k
     if D2 is not None:
-        second_k, second_details = solve(D2,method=method,lazy=lazy,verbose=verbose)
+        delta2, second_details = solve(D2,method=method,lazy=lazy,verbose=verbose)
+        second_k = second_details['obj']
     
     if method == 'lop':
         c1 = D
@@ -368,7 +371,6 @@ def solve_pair(D,D2=None,method=["lop","hillside"][1],minimize=False,min_ndis=No
     y = {}
     u = {}
     v = {}
-    b = {}
     for i in range(n-1):
         for j in range(i+1,n):
             x[i,j] = AP.addVar(lb=0,vtype=GRB.BINARY,ub=1,name="x(%s,%s)"%(i,j)) #binary
