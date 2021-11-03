@@ -121,8 +121,8 @@ def solve_fixed_binary_x(D,orig_k,orig_sol_x,minimize=False,method=["lop","hills
     b={}
     for i in range(n-1):
         for j in range(i+1,n):
-            u[i,j] = AP.addVar(name="u(%s,%s)"%(i,j),vtype=GRB.BINARY)
-            v[i,j] = AP.addVar(name="v(%s,%s)"%(i,j),vtype=GRB.BINARY)
+            u[i,j] = AP.addVar(name="u(%s,%s)"%(i,j),vtype=GRB.CONTINUOUS)
+            v[i,j] = AP.addVar(name="v(%s,%s)"%(i,j),vtype=GRB.CONTINUOUS)
     AP.update()
     for i in range(n-1):
         for j in range(i+1,n):
@@ -152,7 +152,7 @@ def solve_fixed_binary_x(D,orig_k,orig_sol_x,minimize=False,method=["lop","hills
     r = np.sum(sol_x,axis=0)
     ranking = np.argsort(r)
     perm = tuple([int(item) for item in ranking])
-    details = {"obj":AP.objVal,"perm":perm,"x":sol_x,"sol_u":sol_u,"sol_v":sol_v}
+    details = {"obj":AP.objVal,"perm":perm,"x":sol_x,"u":sol_u,"v":sol_v}
     if method == 'hillside':
         details['c'] = c
         k = round(k)
@@ -234,6 +234,7 @@ def solve_fixed_cont_x(D,orig_k,orig_sol_x,minimize=False,method=["lop","hillsid
     r = np.sum(sol_x,axis=0)
     ranking = np.argsort(r)
     perm = tuple([int(item) for item in ranking])
+    #details = {"obj":AP.objVal,"perm":perm,"x":sol_x}
     details = {"obj":AP.objVal,"perm":perm,"x":sol_x,"u":sol_u,"v":sol_v}
     if method == 'hillside':
         details['c'] = c

@@ -230,7 +230,64 @@ def show_score_xstar(xstars,indices=None,group_label="Group",fixed_r=None,resolv
         font='Times',
         orient='bottom'
     )
-    return g,score_df,ordered_xstars
+    return g,score_df,ordered_xstars  
+
+def show_single_xstar(x,indices=None,fixed_r=None,
+                      width=300,height=300,
+                      labelFontSize=10,titleFontSize=10):
+    ordered_xstars = {}
+    if fixed_r is not None and key in fixed_r:
+        r = fixed_r[key]
+    else:
+        r = x.sum(axis=0)
+    order = np.argsort(r)
+    xstar = x.copy().iloc[order,:].iloc[:,order]
+    xstar.loc[:,:] = threshold_x(xstar.values)
+    if indices is not None:
+        x = x.iloc[indices[key],:].iloc[:,indices[key]]
+    # For coloring purposes
+    x.loc[:,:] = threshold_x(x.values)
+    ordered_xstar = xstar
+    inxs = np.triu_indices(len(xstar),k=1)
+    xstar_upper = xstar.values[inxs]
+    nfrac_upper = sum((xstar_upper > 0) & (xstar_upper < 1))
+    none_upper = sum(xstar_upper == 1)
+    nzero_upper = sum(xstar_upper == 0)
+    score_series = pd.Series([nfrac_upper,none_upper,nzero_upper],
+                             index=["num_frac_xstar_upper","num_one_xstar_upper","num_zero_xstar_upper"])
+    df = x.stack().reset_index()
+    df.columns=["i","j","x"]
+
+    df["ri"] = list(r.loc[df["i"]])
+    df["rj"] = list(r.loc[df["j"]])
+    df.loc[:,"c"] = "white"
+    df.loc[(df["x"] > 0) & (df["x"] < 1) & (df["ri"] < df["rj"]),"c"] = "green"
+    df.loc[(df["x"] > 0) & (df["x"] < 1) & (df["ri"] > df["rj"]),"c"] = "red"
+    df.loc[df["i"] == df["j"],"c"] = "black" 
+
+    g = alt.Chart(df,width=width).mark_square().encode(
+        x=alt.X(
+            'i:N',
+            axis=alt.Axis(labelOverlap=False,labelFontSize=8),
+            title="r",
+            sort=alt.EncodingSortField(field="ri",order="ascending") # The order to sort in
+        ),
+        y=alt.Y(
+            'j:N',
+            axis=alt.Axis(labelOverlap=False,labelFontSize=8),
+            title="r",
+            sort=alt.EncodingSortField(field="rj",order="ascending") # The order to sort in
+        ),
+        color=alt.Color("c",scale=None)#alt.Scale(scheme='greys'))
+    ).properties(
+        width=width,
+        height=height
+    ).configure_axis(
+        labelFontSize=labelFontSize,
+        titleFontSize=titleFontSize
+    )
+    
+    return g,score_series,ordered_xstar
 
 def show_score_xstar2(xstars,indices=None,group_label="Group",fixed_r=None,resolve_scale=False,columns=1,width=300,height=300,labelFontSize=12):
     all_df = pd.DataFrame(columns=["i","j","x",group_label,"ri","rj"])
