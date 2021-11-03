@@ -49,6 +49,7 @@ def spider2(perm1,perm2,file=None,fig_format="PNG",width=5,height=10,font_size=8
     #rcParams['figure.constrained_layout.h_pad'] = 5
     
     #plt.tight_layout()
+    plt.clf()
 
     G = nx.Graph()
 
@@ -165,7 +166,7 @@ def spider(P2,file=None,fig_format="PNG",width=5,height=10,font_size=8):
     if file is not None:
         #A.draw(file)
         plt.savefig(file)
-    
+
 def show_score_xstar(xstars,indices=None,group_label="Group",fixed_r=None,resolve_scale=False,columns=1,width=300,height=300):
     all_df = pd.DataFrame(columns=["i","j","x",group_label,"ri","rj"])
     score_df = pd.DataFrame(columns=["num_frac_xstar_upper","num_one_xstar_upper","num_zero_xstar_upper"])
