@@ -37,6 +37,70 @@ def AB_to_P2(A,B):
     P2 = pd.DataFrame(np.array([A,B]))
     return P2
 
+def spider3(perm1,perm2,file=None,fig_format="PNG",width=5,height=10,font_size=8,xmult = 2,ymult=1.2):
+    assert len(perm1) == len(perm2)
+    assert type(perm1) == pd.Series
+    assert type(perm2) == pd.Series
+    assert perm1.name != perm2.name
+    
+    rcParams['figure.figsize'] = width, height
+    
+    #rcParams['figure.constrained_layout.h_pad'] = 5
+    
+    #plt.tight_layout()
+    plt.clf()
+
+    G = nx.Graph()
+
+    pos = {}
+    buffer = 0.25
+    step = (2-2*buffer)/len(perm1)
+    labels={}
+    y1 = []
+    y2 = []
+    y = []
+    index = [] 
+    for i in range(len(perm1)):
+        name1 = f"{perm1.name}:{perm1.iloc[i]}"
+        name2 = f"{perm2.name}:{perm2.iloc[i]}"
+        G.add_node(name1)
+        G.add_node(name2)
+        loc = 1-buffer-(i*step)
+        pos[name1] = np.array([-1,loc])
+        pos[name2] = np.array([1,loc])
+        labels[name1] = perm1.index[i]
+        labels[name2] = perm2.index[i]
+        y1.append(name1)
+        y2.append(name2)
+        y.append("A")
+        y.append("B")
+        index.append(name1)
+        index.append(name2)
+    y=pd.Series(y,index=index)
+
+    for i in range(len(perm1)):
+        name1 = f"{perm1.name}:{perm1.iloc[i]}"
+        ix = np.where(perm1.iloc[i] == perm2)[0][0]
+        name2 = f"{perm2.name}:{perm2.iloc[ix]}"
+        G.add_edge(name1, name2)
+    edges = G.edges()
+
+    nx.draw_networkx_labels(G,pos=pos,labels=labels,font_size=font_size)
+
+    color_map = y.map({"A":"white","B":"white"})
+    nx.draw(G, pos, node_color=color_map)
+    
+    xmax= xmult*max(xx for xx,yy in pos.values())
+    ymax= ymult*max(yy for xx,yy in pos.values())
+    plt.xlim(-xmax,xmax)
+    plt.ylim(-ymax,ymax)
+    
+    #A = to_agraph(G)
+    #A.layout('dot')
+    
+    #nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
+    if file is not None:
+        plt.savefig(file)
 
 def spider2(perm1,perm2,file=None,fig_format="PNG",width=5,height=10,font_size=8,xmult = 2,ymult=1.2):
     assert len(perm1) == len(perm2)
@@ -235,7 +299,7 @@ def show_score_xstar(xstars,indices=None,group_label="Group",fixed_r=None,resolv
 
 def show_single_xstar(x,indices=None,fixed_r=None,
                       width=300,height=300,
-                      labelFontSize=10,titleFontSize=10):
+                      labelFontSize=10,titleFontSize=10,prepare_url_func=None):
     ordered_xstars = {}
     if fixed_r is not None and key in fixed_r:
         r = fixed_r[key]
@@ -266,7 +330,11 @@ def show_single_xstar(x,indices=None,fixed_r=None,
     df.loc[(df["x"] > 0) & (df["x"] < 1) & (df["ri"] > df["rj"]),"c"] = "red"
     df.loc[df["i"] == df["j"],"c"] = "black" 
 
-    g = alt.Chart(df,width=width).mark_square().encode(
+    if prepare_url_func is not None:
+        df_url = prepare_url_func(df)
+    else:
+        df_url = df
+    g = alt.Chart(df_url,width=width).mark_square().encode(
         x=alt.X(
             'i:N',
             axis=alt.Axis(labelOverlap=False,labelFontSize=8),
@@ -279,7 +347,7 @@ def show_single_xstar(x,indices=None,fixed_r=None,
             title="r",
             sort=alt.EncodingSortField(field="rj",order="ascending") # The order to sort in
         ),
-        color=alt.Color("c",scale=None)#alt.Scale(scheme='greys'))
+        color=alt.Color("c:N",scale=None)#alt.Scale(scheme='greys'))
     ).properties(
         width=width,
         height=height

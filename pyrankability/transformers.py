@@ -50,6 +50,17 @@ class ComputeDTransformer(BaseEstimator, TransformerMixin):
             for i in range(len(Ds)):
                 Ds[i] = Ds[i].reindex(index=self.team_range,columns=self.team_range)
         return Ds
+    
+def count(games,teams):
+    trans = pyrplib.transformers.ComputeDTransformer()
+    trans.fit(games)
+    D,ID = trans.transform(games)
+    D = D.reindex(index=teams,columns=teams)
+    ID = ID.reindex(index=teams,columns=teams)
+    return D,ID,trans
+
+def direct(D,ID,trans):
+    return D
 
 
 """
