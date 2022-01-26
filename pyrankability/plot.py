@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import networkx as nx
+import nx_altair as nxa
 import numpy as np
 import pandas as pd
 import altair as alt
@@ -37,25 +38,17 @@ def AB_to_P2(A,B):
     P2 = pd.DataFrame(np.array([A,B]))
     return P2
 
-def spider3(perm1,perm2,file=None,fig_format="PNG",width=5,height=10,font_size=8,xmult = 2,ymult=1.2):
+def spider3(perm1,perm2,font_size=18,xmult = 2,ymult=20):
     assert len(perm1) == len(perm2)
     assert type(perm1) == pd.Series
     assert type(perm2) == pd.Series
     assert perm1.name != perm2.name
     
-    rcParams['figure.figsize'] = width, height
-    
-    #rcParams['figure.constrained_layout.h_pad'] = 5
-    
-    #plt.tight_layout()
-    plt.clf()
-
     G = nx.Graph()
 
     pos = {}
     buffer = 0.25
     step = (2-2*buffer)/len(perm1)
-    labels={}
     y1 = []
     y2 = []
     y = []
@@ -63,13 +56,11 @@ def spider3(perm1,perm2,file=None,fig_format="PNG",width=5,height=10,font_size=8
     for i in range(len(perm1)):
         name1 = f"{perm1.name}:{perm1.iloc[i]}"
         name2 = f"{perm2.name}:{perm2.iloc[i]}"
-        G.add_node(name1)
-        G.add_node(name2)
+        G.add_node(name1, label=perm1.index[i])
+        G.add_node(name2, label=perm2.index[i])
         loc = 1-buffer-(i*step)
         pos[name1] = np.array([-1,loc])
         pos[name2] = np.array([1,loc])
-        labels[name1] = perm1.index[i]
-        labels[name2] = perm2.index[i]
         y1.append(name1)
         y2.append(name2)
         y.append("A")
@@ -83,24 +74,15 @@ def spider3(perm1,perm2,file=None,fig_format="PNG",width=5,height=10,font_size=8
         ix = np.where(perm1.iloc[i] == perm2)[0][0]
         name2 = f"{perm2.name}:{perm2.iloc[ix]}"
         G.add_edge(name1, name2)
-    edges = G.edges()
+    
+    #color_map = y.map({"A":"white","B":"white"})
 
-    nx.draw_networkx_labels(G,pos=pos,labels=labels,font_size=font_size)
-
-    color_map = y.map({"A":"white","B":"white"})
-    nx.draw(G, pos, node_color=color_map)
-    
-    xmax= xmult*max(xx for xx,yy in pos.values())
-    ymax= ymult*max(yy for xx,yy in pos.values())
-    plt.xlim(-xmax,xmax)
-    plt.ylim(-ymax,ymax)
-    
-    #A = to_agraph(G)
-    #A.layout('dot')
-    
-    #nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
-    if file is not None:
-        plt.savefig(file)
+    height = int((len(pos) / xmult) * ymult) 
+    viz = nxa.draw_altair.draw_networkx(G, pos=pos, font_size=font_size, node_label='label', node_color='white').properties(
+        width=150 * xmult,
+        height=height
+    )
+    return viz, (150 * xmult) + 200, height + 50
 
 def spider2(perm1,perm2,file=None,fig_format="PNG",width=5,height=10,font_size=8,xmult = 2,ymult=1.2):
     assert len(perm1) == len(perm2)
