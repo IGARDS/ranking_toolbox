@@ -26,7 +26,7 @@ def solve(S_orig, c_orig = None, fix_x = {}, method="hillside",num_random_restar
     # Pass verbosity flag to Gurobi prior to any calls
     setParam( 'OutputFlag', verbose )
     
-    temp_dir = tempfile.mkdtemp(dir="/dev/shm") # try to write this model to memory
+    temp_dir = tempfile.mkdtemp() # try to write this model to memory
     
     indices = list(range(n))
     
@@ -320,7 +320,7 @@ def solve_error2(D_orig,max_error=10,min_error=0,method=["lop","hillside"][1],nu
     n = D_orig.shape[0]
     
     try:
-        temp_dir = tempfile.mkdtemp(dir="/dev/shm") # try to write this model to memory
+        temp_dir = tempfile.mkdtemp() # try to write this model to memory
     
         if method == 'hillside':
             c_orig = compute_C(D_orig)
@@ -570,7 +570,7 @@ def solve_error(D_orig,max_error=10,min_error=0,method=["lop","hillside"][1],num
     n = D_orig.shape[0]
     
     try:
-        temp_dir = tempfile.mkdtemp(dir="/dev/shm") # try to write this model to memory
+        temp_dir = tempfile.mkdtemp() # try to write this model to memory
     
         if method == 'hillside':
             c_orig = compute_C(D_orig)
