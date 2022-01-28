@@ -1,7 +1,9 @@
 import matplotlib.pyplot as plt
 import networkx as nx
+import nx_altair as nxa
 import numpy as np
 import pandas as pd
+import math
 import altair as alt
 from pylab import rcParams
 
@@ -37,44 +39,39 @@ def AB_to_P2(A,B):
     P2 = pd.DataFrame(np.array([A,B]))
     return P2
 
-def spider3(perm1,perm2,file=None,fig_format="PNG",width=5,height=10,font_size=8,xmult = 2,ymult=1.2):
+def spider(perm1,perm2,font_size=14):
     assert len(perm1) == len(perm2)
     assert type(perm1) == pd.Series
     assert type(perm2) == pd.Series
     assert perm1.name != perm2.name
     
-    rcParams['figure.figsize'] = width, height
-    
-    #rcParams['figure.constrained_layout.h_pad'] = 5
-    
-    #plt.tight_layout()
-    plt.clf()
-
     G = nx.Graph()
 
-    pos = {}
+    node_pos = {}
+    label_pos = {}
     buffer = 0.25
     step = (2-2*buffer)/len(perm1)
-    labels={}
     y1 = []
     y2 = []
     y = []
     index = [] 
+    max_length_label = perm1.index.map(lambda x: len(x)).max()
+    relative_label_position = max(math.log(max_length_label, 7), 1.2)
     for i in range(len(perm1)):
         name1 = f"{perm1.name}:{perm1.iloc[i]}"
         name2 = f"{perm2.name}:{perm2.iloc[i]}"
-        G.add_node(name1)
-        G.add_node(name2)
+        G.add_node(name1, label=perm1.index[i])
+        G.add_node(name2, label=perm2.index[i])
         loc = 1-buffer-(i*step)
-        pos[name1] = np.array([-1,loc])
-        pos[name2] = np.array([1,loc])
-        labels[name1] = perm1.index[i]
-        labels[name2] = perm2.index[i]
+        node_pos[name1] = np.array([-1,loc])
+        node_pos[name2] = np.array([1,loc])
+        label_pos[name1] = np.array([-1 * relative_label_position,loc])
+        label_pos[name2] = np.array([relative_label_position,loc])
         y1.append(name1)
         y2.append(name2)
         y.append("A")
         y.append("B")
-        index.append(name1)
+        index.append(name1) 
         index.append(name2)
     y=pd.Series(y,index=index)
 
@@ -83,153 +80,11 @@ def spider3(perm1,perm2,file=None,fig_format="PNG",width=5,height=10,font_size=8
         ix = np.where(perm1.iloc[i] == perm2)[0][0]
         name2 = f"{perm2.name}:{perm2.iloc[ix]}"
         G.add_edge(name1, name2)
-    edges = G.edges()
 
-    nx.draw_networkx_labels(G,pos=pos,labels=labels,font_size=font_size)
-
-    color_map = y.map({"A":"white","B":"white"})
-    nx.draw(G, pos, node_color=color_map)
-    
-    xmax= xmult*max(xx for xx,yy in pos.values())
-    ymax= ymult*max(yy for xx,yy in pos.values())
-    plt.xlim(-xmax,xmax)
-    plt.ylim(-ymax,ymax)
-    
-    #A = to_agraph(G)
-    #A.layout('dot')
-    
-    #nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
-    if file is not None:
-        plt.savefig(file)
-
-def spider2(perm1,perm2,file=None,fig_format="PNG",width=5,height=10,font_size=8,xmult = 2,ymult=1.2):
-    assert len(perm1) == len(perm2)
-    assert type(perm1) == pd.Series
-    assert type(perm2) == pd.Series
-    assert perm1.name != perm2.name
-    
-    rcParams['figure.figsize'] = width, height
-    
-    #rcParams['figure.constrained_layout.h_pad'] = 5
-    
-    #plt.tight_layout()
-    plt.clf()
-
-    G = nx.Graph()
-
-    pos = {}
-    buffer = 0.25
-    step = (2-2*buffer)/len(perm1)
-    labels={}
-    y1 = []
-    y2 = []
-    y = []
-    index = [] 
-    for i in range(len(perm1)):
-        name1 = f"{perm1.name}:{perm1.loc[i]}"
-        name2 = f"{perm2.name}:{perm2.loc[i]}"
-        G.add_node(name1)
-        G.add_node(name2)
-        loc = 1-buffer-(i*step)
-        pos[name1] = np.array([-1,loc])
-        pos[name2] = np.array([1,loc])
-        labels[name1] = perm1.loc[i]
-        labels[name2] = perm2.loc[i]
-        y1.append(name1)
-        y2.append(name2)
-        y.append("A")
-        y.append("B")
-        index.append(name1)
-        index.append(name2)
-    y=pd.Series(y,index=index)
-
-    for i in range(len(perm1)):
-        name1 = f"{perm1.name}:{perm1.loc[i]}"
-        ix = np.where(perm1.loc[i] == perm2)[0][0]
-        name2 = f"{perm2.name}:{perm2.loc[ix]}"
-        G.add_edge(name1, name2)
-    edges = G.edges()
-
-    nx.draw_networkx_labels(G,pos=pos,labels=labels,font_size=font_size)
-
-    color_map = y.map({"A":"white","B":"white"})
-    nx.draw(G, pos, node_color=color_map)
-    
-    xmax= xmult*max(xx for xx,yy in pos.values())
-    ymax= ymult*max(yy for xx,yy in pos.values())
-    plt.xlim(-xmax,xmax)
-    plt.ylim(-ymax,ymax)
-    
-    #A = to_agraph(G)
-    #A.layout('dot')
-    
-    #nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
-    if file is not None:
-        plt.savefig(file)
-
-def spider(P2,file=None,fig_format="PNG",width=5,height=10,font_size=8):
-    """
-    from pyrankability.plot import spider, AB_to_P2
-
-    A = [4, 10, 1, 12, 3, 9, 0, 6, 5, 11, 2, 8, 7]
-    B = [5, 4, 10, 1, 7, 6, 12, 3, 9, 0, 11, 2, 8]
-    spider(AB_to_P2(A,B))
-    """
-    rcParams['figure.figsize'] = width, height
-
-    G = nx.Graph()
-
-    pos = {}
-    buffer = 0.25
-    step = (2-2*buffer)/P2.shape[1]
-    labels={}
-    y1 = []
-    y2 = []
-    y = []
-    index = [] 
-    for i in range(P2.shape[1]):
-        v = str(i+1)
-        name1 = f"A{v}:{P2.iloc[0,i]}"
-        name2 = f"B{v}:{P2.iloc[1,i]}"
-        #name2 = "B%d:%d"%(i+1,P2.iloc[1,i])
-        G.add_node(name1)
-        G.add_node(name2)
-        loc = 1-buffer-(i*step)
-        pos[name1] = np.array([-1,loc])
-        pos[name2] = np.array([1,loc])
-        labels[name1] = P2.iloc[0,i]
-        labels[name2] = P2.iloc[1,i]
-        y1.append(name1)
-        y2.append(name2)
-        y.append("A")
-        y.append("B")
-        index.append(name1)
-        index.append(name2)
-    y=pd.Series(y,index=index)
-
-    for i in range(P2.shape[1]):
-        v=str(i+1)
-        name1 = f"A{v}:{P2.iloc[0,i]}"
-        #name1 = "A%d:%d"%(i+1,P2.iloc[0,i])
-        ix = np.where(P2.iloc[1,:] == P2.iloc[0,i])[0][0]
-        v=str(ix+1)
-        name2 = f"B{v}:{P2.iloc[0,i]}"
-        #name2 = "B%d:%d"%(ix+1,P2.iloc[0,i])
-        G.add_edge(name1, name2)
-    edges = G.edges()
-
-    nx.draw_networkx_labels(G,pos=pos,labels=labels,font_size=font_size)
-
-    color_map = y.map({"A":"white","B":"white"})
-    nx.draw(G, pos, node_color=color_map)
-    
-    #A = to_agraph(G)
-    #A.layout('dot')
-    
-    #nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
-    if file is not None:
-        #A.draw(file)
-        plt.savefig(file)
+    # Creates the spider plot. The calling function will need to handle resizing.
+    viz = nxa.draw_altair.draw_networkx(G, pos=node_pos, node_color='white')
+    viz = alt.layer(viz, nxa.draw_altair.draw_networkx_labels(G, pos=label_pos, font_size=font_size, node_label='label'))
+    return viz
 
 def show_score_xstar(xstars,indices=None,group_label="Group",fixed_r=None,resolve_scale=False,columns=1,width=300,height=300):
     all_df = pd.DataFrame(columns=["i","j","x",group_label,"ri","rj"])
@@ -298,7 +153,7 @@ def show_score_xstar(xstars,indices=None,group_label="Group",fixed_r=None,resolv
     return g,score_df,ordered_xstars  
 
 def show_single_xstar(x,indices=None,fixed_r=None,
-                      width=300,height=300,
+                      width=400,height=400,
                       labelFontSize=10,titleFontSize=10,prepare_url_func=None):
     ordered_xstars = {}
     if fixed_r is not None and key in fixed_r:
