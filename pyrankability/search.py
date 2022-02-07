@@ -716,6 +716,10 @@ def collect(D_or_C,model,opt_k):
     return perms, xs, xstar
 
 def scip_collect(D,model_file,max_num_solutions=1000,solution_file=common.get_temp_model_solution(),show_output=True,compute_C_func=None):
+    assert type(D) == pd.DataFrame
+    assert D.shape[0] == D.shape[1]
+    assert set(D.index) == set(D.columns)
+    items = D.index
     # Make sure the model file is in the correct format
     r = os.system(f"sed '/^OBJSENS/d' {model_file} > {model_file}.fixed.mps")
     if r != 0:
@@ -736,6 +740,8 @@ def scip_collect(D,model_file,max_num_solutions=1000,solution_file=common.get_te
     solutions = pd.read_csv(solution_file,sep=', ')
     x_columns = solutions.columns[1:-1]
     xs = []
+    perms = []
+    rankings = []
     a,b,c = 1,1,-2*len(x_columns)
     n = int((-b + np.sqrt(b**2 - 4*a*c))/(2*a) + 1)
     xstar = np.zeros((n,n))
@@ -758,9 +764,14 @@ def scip_collect(D,model_file,max_num_solutions=1000,solution_file=common.get_te
         xs.append(x)
         objs.append(obj)
         xstar += x
+        r = np.sum(x,axis=0)
+        ranking = pd.Series(r,index=items)
+        rankings.append(ranking)
+        perm = tuple([int(item) for item in np.argsort(r)])
+        perms.append(perm)
     xstar = xstar/solutions.shape[0]
-    xstar = pd.DataFrame(xstar)
-    results = {"xs":xs, "objs":objs,"xstar":xstar}
+    xstar = pd.DataFrame(xstar,index=items,columns=items)
+    results = {"xs":xs, "objs":objs,"xstar":xstar,"perms":perms,"rankings":rankings}
     return results
 
 def scip_count():
