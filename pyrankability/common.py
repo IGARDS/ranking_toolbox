@@ -15,6 +15,11 @@ def get_temp_model_path():
     model_file = os.path.join(temp_dir,"model.mps")
     return model_file
 
+def get_temp_model_solution():
+    temp_dir = tempfile.mkdtemp()
+    model_solutions = os.path.join(temp_dir,"model.solutions")
+    return model_solutions
+
 def write_model(AP,model_file=None):
     if model_file is None:
         model_file = get_temp_model_path()

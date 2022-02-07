@@ -6,6 +6,7 @@ import tempfile
 import os
 import shutil
 import time
+import subprocess
 
 import numpy as np
 from gurobipy import *
@@ -713,3 +714,51 @@ def collect(D_or_C,model,opt_k):
         perms.append(perm)
         
     return perms, xs, xstar
+
+def scip_collect(D,model_file,solution_file=common.get_temp_model_solution(),show_output=True,compute_C_func=None):
+    # Make sure the model file is in the correct format
+    r = os.system(f"sed '/^OBJSENS/d' {model_file} > {model_file}.fixed.mps")
+    if r != 0:
+        raise Exception(f"Unknown error while trying to fix {model_file}")
+    cmd = ["scip_collect.sh", f"{model_file}.fixed.mps", solution_file]
+    if show_output:
+        print("Running:"," ".join(cmd))
+    result = subprocess.run(cmd, stdout=subprocess.PIPE,stderr=subprocess.PIPE, text=True)
+    if show_output:
+        print("STDOUT:")
+        print(result.stdout)
+        print("STDERR:")
+        print(result.stderr)
+              
+    solutions = pd.read_csv(solution_file,sep=', ')
+    x_columns = solutions.columns[1:-1]
+    xs = []
+    a,b,c = 1,1,-2*len(x_columns)
+    n = int((-b + np.sqrt(b**2 - 4*a*c))/(2*a) + 1)
+    xstar = np.zeros((n,n))
+              
+    if compute_C_func is not None:
+        C = compute_C_func(D)
+    else:
+        C = D
+    objs = []
+    s = 0
+    for k in range(solutions.shape[0]):
+        x = np.zeros((n,n))
+        for c in x_columns:
+            ij_str = c.replace("x(","").replace(")","")
+            i,j = ij_str.split(",")
+            i,j = int(i),int(j)
+            x[i,j] = solutions.loc[k,c]
+            x[j,i] = 1 - x[i,j]
+        obj = np.sum(np.sum(C*x))
+        xs.append(x)
+        objs.append(obj)
+        xstar += x
+    xstar = xstar/solutions.shape[0]
+    xstar = pd.DataFrame(xstar)
+    results = {"xs":xs, "objs":objs,"xstar":xstar}
+    return results
+
+def scip_count():
+    pass
