@@ -715,12 +715,15 @@ def collect(D_or_C,model,opt_k):
         
     return perms, xs, xstar
 
-def scip_collect(D,model_file,solution_file=common.get_temp_model_solution(),show_output=True,compute_C_func=None):
+def scip_collect(D,model_file,max_num_solutions=1000,solution_file=common.get_temp_model_solution(),show_output=True,compute_C_func=None):
     # Make sure the model file is in the correct format
     r = os.system(f"sed '/^OBJSENS/d' {model_file} > {model_file}.fixed.mps")
     if r != 0:
         raise Exception(f"Unknown error while trying to fix {model_file}")
-    cmd = ["scip_collect.sh", f"{model_file}.fixed.mps", solution_file]
+    
+    #set constraints countsols sollimit 1000
+    max_num_solutions = str(max_num_solutions)
+    cmd = ["scip_collect.sh", f"{model_file}.fixed.mps", solution_file,max_num_solutions]
     if show_output:
         print("Running:"," ".join(cmd))
     result = subprocess.run(cmd, stdout=subprocess.PIPE,stderr=subprocess.PIPE, text=True)
