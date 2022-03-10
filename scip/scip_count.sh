@@ -3,7 +3,7 @@
 MODEL=$1
 echo $MODEL
 
-scip <<EOF
+docker run scipoptsuite/scipoptsuite:7.0.2 scip <<EOF
 read $MODEL
 count
 EOF

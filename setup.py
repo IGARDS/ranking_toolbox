@@ -1,19 +1,11 @@
-import setuptools
+from setuptools import setup
 
-setuptools.setup(
-    name="pyrankability",
-    version="0.1.0",
-    author="Paul Anderson",
-    author_email="pauleanderson@gmail.com",
-    description="Rankability Toolbox",
-    long_description=open("README.md").read(),
-    long_description_content_type="text/markdown",
-    url="https://github.com/pypa/pyrankability",
-    packages=setuptools.find_packages(),
-    install_requires=[ "networkx", "numpy", "pandas" , "scipy", "dask", "toolz", "joblib", "distributed", "sklearn"],
-    classifiers=[
-        "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: MIT License",
-        "Operating System :: OS Independent",
-    ],
-)
+setup(name='pyrankability',
+      version='0.1',
+      description='Ranking Python Library',
+      url='https://github.com/IGARDS/ranking_toolbox',
+      author='Paul Anderson, Tim Chartier, Amy Langville, Kathryn Behling',
+      author_email='pauleanderson',
+      license='MIT',
+      packages=['pyrankability'],
+      zip_safe=False)
