@@ -156,8 +156,8 @@ def show_single_xstar(x,indices=None,fixed_r=None,
                       width=400,height=400,
                       labelFontSize=10,titleFontSize=10,prepare_url_func=None):
     ordered_xstars = {}
-    if fixed_r is not None and key in fixed_r:
-        r = fixed_r[key]
+    if fixed_r is not None:
+        r = fixed_r
     else:
         r = x.sum(axis=0)
     order = np.argsort(r)
