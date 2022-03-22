@@ -6,3 +6,4 @@ from . import plot
 from . import construct
 from . import transformers
 from . import utils
+from . import features
