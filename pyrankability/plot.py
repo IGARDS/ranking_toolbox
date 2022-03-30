@@ -154,7 +154,7 @@ def show_score_xstar(xstars,indices=None,group_label="Group",fixed_r=None,resolv
 
 def show_single_xstar(x,indices=None,fixed_r=None,
                       width=400,height=400,
-                      labelFontSize=10,titleFontSize=10,prepare_url_func=None):
+                      labelFontSize=10,titleFontSize=10,prepare_url_func=None,red_green=True):
     ordered_xstars = {}
     if fixed_r is not None:
         r = fixed_r
@@ -180,10 +180,18 @@ def show_single_xstar(x,indices=None,fixed_r=None,
 
     df["ri"] = list(r.loc[df["i"]])
     df["rj"] = list(r.loc[df["j"]])
-    df.loc[:,"c"] = "white"
-    df.loc[(df["x"] > 0) & (df["x"] < 1) & (df["ri"] < df["rj"]),"c"] = "green"
-    df.loc[(df["x"] > 0) & (df["x"] < 1) & (df["ri"] > df["rj"]),"c"] = "red"
-    df.loc[df["i"] == df["j"],"c"] = "black" 
+    if red_green:
+        df.loc[:,"c"] = "white"
+        df.loc[(df["x"] > 0) & (df["x"] < 1) & (df["ri"] < df["rj"]),"c"] = "green"
+        df.loc[(df["x"] > 0) & (df["x"] < 1) & (df["ri"] > df["rj"]),"c"] = "red"
+        df.loc[df["i"] == df["j"],"c"] = "black" 
+        color = alt.Color("c:N",scale=None)
+    else:
+        df.loc[:,"c"] = 0
+        df.loc[(df["x"] > 0) & (df["x"] < 1) & (df["ri"] < df["rj"]),"c"] = 1-(df.loc[(df["x"] > 0) & (df["x"] < 1) & (df["ri"] < df["rj"]),"x"])
+        df.loc[(df["x"] > 0) & (df["x"] < 1) & (df["ri"] > df["rj"]),"c"] = (df.loc[(df["x"] > 0) & (df["x"] < 1) & (df["ri"] > df["rj"]),"x"])
+        df.loc[df["i"] == df["j"],"c"] = 1
+        color = alt.Color("c",scale=alt.Scale(scheme="greys"))        
 
     if prepare_url_func is not None:
         df_url = prepare_url_func(df)
@@ -202,7 +210,7 @@ def show_single_xstar(x,indices=None,fixed_r=None,
             title="r",
             sort=alt.EncodingSortField(field="rj",order="ascending") # The order to sort in
         ),
-        color=alt.Color("c:N",scale=None)#alt.Scale(scheme='greys'))
+        color=color #alt.Color("c:N",scale=None)#alt.Scale(scheme='greys'))
     ).properties(
         width=width,
         height=height

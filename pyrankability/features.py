@@ -11,7 +11,8 @@ def weighted_matrix(N):
 
 def beta(Xstar_r_r, normalize = True):
   Xstar_r_r = Xstar_r_r.copy()
-  Xstar_r_r.values[:,:] = np.ceil(Xstar_r_r.values)
+  #Xstar_r_r.values[:,:] = np.ceil(Xstar_r_r.values)
+  Xstar_r_r.values[:,:] = ((Xstar_r_r.values > 0) & (Xstar_r_r.values < 1)).astype(int)
   n = len(Xstar_r_r)
   worst_case_Xstar_r_r = np.ones(Xstar_r_r.shape)
   def _beta(Xstar_r_r,n):
