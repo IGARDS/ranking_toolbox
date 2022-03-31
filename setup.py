@@ -7,5 +7,9 @@ setup(name='pyrankability',
       author='Paul Anderson, Tim Chartier, Amy Langville, Kathryn Behling',
       author_email='pauleanderson',
       license='MIT',
+      install_requires=[
+          'gurobipy',
+          'matplotlib'
+      ],
       packages=['pyrankability'],
       zip_safe=False)
