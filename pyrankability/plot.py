@@ -159,7 +159,7 @@ def show_single_xstar(x,indices=None,fixed_r=None,
     if fixed_r is not None:
         r = fixed_r
     else:
-        r = x.sum(axis=0)
+        r = x.sum(axis=1)
     order = np.argsort(r)
     xstar = x.copy().iloc[order,:].iloc[:,order]
     xstar.loc[:,:] = threshold_x(xstar.values)
@@ -191,7 +191,9 @@ def show_single_xstar(x,indices=None,fixed_r=None,
         df.loc[(df["x"] > 0) & (df["x"] < 1) & (df["ri"] < df["rj"]),"c"] = 1-(df.loc[(df["x"] > 0) & (df["x"] < 1) & (df["ri"] < df["rj"]),"x"])
         df.loc[(df["x"] > 0) & (df["x"] < 1) & (df["ri"] > df["rj"]),"c"] = (df.loc[(df["x"] > 0) & (df["x"] < 1) & (df["ri"] > df["rj"]),"x"])
         df.loc[df["i"] == df["j"],"c"] = 1
-        color = alt.Color("c",scale=alt.Scale(scheme="greys"))        
+        scale=alt.Scale(domain=[0, 0.0001, 1], range=["white", "white", "grey"])
+        #color = alt.Color("c",scale=alt.Scale(scheme="greys"))        
+        color = alt.Color("c",scale=scale)
 
     if prepare_url_func is not None:
         df_url = prepare_url_func(df)
