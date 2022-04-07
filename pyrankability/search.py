@@ -737,7 +737,7 @@ def scip_collect(D,model_file,max_num_solutions=1000,solution_file=common.get_te
         print("STDERR:")
         print(result.stderr)
               
-    solutions = pd.read_csv(solution_file,sep=', ')
+    solutions = pd.read_csv(solution_file,sep=', ',engine='python')
     x_columns = solutions.columns[1:-1]
     xs = []
     perms = []

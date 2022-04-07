@@ -157,9 +157,9 @@ def show_single_xstar(x,indices=None,fixed_r=None,
                       labelFontSize=10,titleFontSize=10,prepare_url_func=None,red_green=True):
     ordered_xstars = {}
     if fixed_r is not None:
-        r = fixed_r
+        r = -fixed_r
     else:
-        r = x.sum(axis=1)
+        r = -x.sum(axis=1)
     order = np.argsort(r)
     xstar = x.copy().iloc[order,:].iloc[:,order]
     xstar.loc[:,:] = threshold_x(xstar.values)
@@ -178,18 +178,19 @@ def show_single_xstar(x,indices=None,fixed_r=None,
     df = x.stack().reset_index()
     df.columns=["i","j","x"]
 
-    df["ri"] = list(r.loc[df["i"]])
-    df["rj"] = list(r.loc[df["j"]])
+    df["ri"] = list(order[df["i"]]) #list(r.loc[df["i"]])
+    df["rj"] = list(order[df["j"]]) #list(r.loc[df["j"]])
+    #import pdb; pdb.set_trace()
     if red_green:
         df.loc[:,"c"] = "white"
-        df.loc[(df["x"] > 0) & (df["x"] < 1) & (df["ri"] < df["rj"]),"c"] = "green"
-        df.loc[(df["x"] > 0) & (df["x"] < 1) & (df["ri"] > df["rj"]),"c"] = "red"
+        df.loc[(df["x"] > 0) & (df["x"] < 1) & (df["ri"] <= df["rj"]),"c"] = "green"
+        df.loc[(df["x"] > 0) & (df["x"] < 1) & (df["ri"] >= df["rj"]),"c"] = "red"
         df.loc[df["i"] == df["j"],"c"] = "black" 
         color = alt.Color("c:N",scale=None)
     else:
         df.loc[:,"c"] = 0
-        df.loc[(df["x"] > 0) & (df["x"] < 1) & (df["ri"] < df["rj"]),"c"] = 1-(df.loc[(df["x"] > 0) & (df["x"] < 1) & (df["ri"] < df["rj"]),"x"])
-        df.loc[(df["x"] > 0) & (df["x"] < 1) & (df["ri"] > df["rj"]),"c"] = (df.loc[(df["x"] > 0) & (df["x"] < 1) & (df["ri"] > df["rj"]),"x"])
+        df.loc[(df["x"] > 0) & (df["x"] < 1) & (df["ri"] <= df["rj"]),"c"] = 1-(df.loc[(df["x"] > 0) & (df["x"] < 1) & (df["ri"] <= df["rj"]),"x"])
+        df.loc[(df["x"] > 0) & (df["x"] < 1) & (df["ri"] >= df["rj"]),"c"] = (df.loc[(df["x"] > 0) & (df["x"] < 1) & (df["ri"] >= df["rj"]),"x"])
         df.loc[df["i"] == df["j"],"c"] = 1
         scale=alt.Scale(domain=[0, 0.0001, 1], range=["white", "white", "grey"])
         #color = alt.Color("c",scale=alt.Scale(scheme="greys"))        
