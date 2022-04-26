@@ -9,18 +9,21 @@ def banded_matrix(N):
 def weighted_matrix(N):
     return np.matrix([[1 / i for _ in range(1, N + 1)] for i in range(1, N + 1)])
 
-def beta(Xstar_r_r, normalize = True):
+def beta(Xstar_r_r, normalize = True, average=False):
     Xstar_r_r = Xstar_r_r.copy()
-    #Xstar_r_r.values[:,:] = np.ceil(Xstar_r_r.values)
-    Xstar_r_r.values[:,:] = ((Xstar_r_r.values > 0) & (Xstar_r_r.values < 1)).astype(int)
+    mask = ((Xstar_r_r.values > 0) & (Xstar_r_r.values < 1))
+    num_frac = sum(mask)
+    Xstar_r_r.values[:,:] = mask.astype(int)
     n = len(Xstar_r_r)
     worst_case_Xstar_r_r = np.ones(Xstar_r_r.shape)
     def _beta(Xstar_r_r,n):
         return (Xstar_r_r * banded_matrix(n) * weighted_matrix(n)).sum().sum()
-    if normalize == True:
-        return _beta(Xstar_r_r,n)/_beta(worst_case_Xstar_r_r,n)
-    else:
-        return _beta(Xstar_r_r,n)
+    result = _beta(Xstar_r_r,n)
+    if normalize:
+        result = result/_beta(worst_case_Xstar_r_r,n)
+    if average:
+        result = result/num_frac
+    return result
 
 def calc_beta(D):
     obj,details = pyrankability.rank.solve(D,method="lop",cont=True)

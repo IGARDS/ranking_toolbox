@@ -152,35 +152,16 @@ def show_score_xstar(xstars,indices=None,group_label="Group",fixed_r=None,resolv
     )
     return g,score_df,ordered_xstars  
 
-def show_single_xstar(x,indices=None,fixed_r=None,
+def show_single_xstar(x,
                       width=400,height=400,
-                      labelFontSize=10,titleFontSize=10,prepare_url_func=None,red_green=True):
-    ordered_xstars = {}
-    if fixed_r is not None:
-        r = -fixed_r
-    else:
-        r = -x.sum(axis=1)
-    order = np.argsort(r)
-    xstar = x.copy().iloc[order,:].iloc[:,order]
-    xstar.loc[:,:] = threshold_x(xstar.values)
-    if indices is not None:
-        x = x.iloc[indices[key],:].iloc[:,indices[key]]
-    # For coloring purposes
-    x.loc[:,:] = threshold_x(x.values)
-    ordered_xstar = xstar
-    inxs = np.triu_indices(len(xstar),k=1)
-    xstar_upper = xstar.values[inxs]
-    nfrac_upper = sum((xstar_upper > 0) & (xstar_upper < 1))
-    none_upper = sum(xstar_upper == 1)
-    nzero_upper = sum(xstar_upper == 0)
-    score_series = pd.Series([nfrac_upper,none_upper,nzero_upper],
-                             index=["num_frac_xstar_upper","num_one_xstar_upper","num_zero_xstar_upper"])
+                      labelFontSize=10,titleFontSize=10,
+                      prepare_url_func=None,red_green=True):
     df = x.stack().reset_index()
     df.columns=["i","j","x"]
 
-    df["ri"] = list(order[df["i"]]) #list(r.loc[df["i"]])
-    df["rj"] = list(order[df["j"]]) #list(r.loc[df["j"]])
-    #import pdb; pdb.set_trace()
+    order = x.sum(axis=1)
+    df["ri"] = list(order.loc[df["i"]]) #list(r.loc[df["i"]])
+    df["rj"] = list(order.loc[df["j"]]) #list(r.loc[df["j"]])
     if red_green:
         df.loc[:,"c"] = "white"
         df.loc[(df["x"] > 0) & (df["x"] < 1) & (df["ri"] <= df["rj"]),"c"] = "green"
@@ -222,7 +203,7 @@ def show_single_xstar(x,indices=None,fixed_r=None,
         titleFontSize=titleFontSize
     )
     
-    return g,score_series,ordered_xstar
+    return g
 
 def show_score_xstar2(xstars,indices=None,group_label="Group",fixed_r=None,resolve_scale=False,columns=1,width=300,height=300,labelFontSize=12):
     all_df = pd.DataFrame(columns=["i","j","x",group_label,"ri","rj"])
