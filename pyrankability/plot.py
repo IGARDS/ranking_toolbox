@@ -159,7 +159,7 @@ def show_single_xstar(x,
     df = x.stack().reset_index()
     df.columns=["i","j","x"]
 
-    order = x.sum(axis=1)
+    order = pd.Series(np.arange(len(x),0,-1),index=x.index)#x.sum(axis=1)
     df["ri"] = list(order.loc[df["i"]]) #list(r.loc[df["i"]])
     df["rj"] = list(order.loc[df["j"]]) #list(r.loc[df["j"]])
     if red_green:
@@ -186,13 +186,13 @@ def show_single_xstar(x,
             'i:N',
             axis=alt.Axis(labelOverlap=False,labelFontSize=8),
             title="r",
-            sort=alt.EncodingSortField(field="ri",order="ascending") # The order to sort in
+            sort=alt.EncodingSortField(field="ri",order="descending") # The order to sort in
         ),
         y=alt.Y(
             'j:N',
             axis=alt.Axis(labelOverlap=False,labelFontSize=8),
             title="r",
-            sort=alt.EncodingSortField(field="rj",order="ascending") # The order to sort in
+            sort=alt.EncodingSortField(field="rj",order="descending") # The order to sort in
         ),
         color=color #alt.Color("c:N",scale=None)#alt.Scale(scheme='greys'))
     ).properties(

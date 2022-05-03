@@ -12,7 +12,7 @@ def weighted_matrix(N):
 def beta(Xstar_r_r, normalize = True, average=False):
     Xstar_r_r = Xstar_r_r.copy()
     mask = ((Xstar_r_r.values > 0) & (Xstar_r_r.values < 1))
-    num_frac = sum(mask)
+    num_frac = sum(sum(mask))
     Xstar_r_r.values[:,:] = mask.astype(int)
     n = len(Xstar_r_r)
     worst_case_Xstar_r_r = np.ones(Xstar_r_r.shape)
@@ -21,7 +21,7 @@ def beta(Xstar_r_r, normalize = True, average=False):
     result = _beta(Xstar_r_r,n)
     if normalize:
         result = result/_beta(worst_case_Xstar_r_r,n)
-    if average:
+    if average and num_frac > 0:
         result = result/num_frac
     return result
 
