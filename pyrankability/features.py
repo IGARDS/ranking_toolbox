@@ -3,6 +3,7 @@ import pandas as pd
 
 from . import common
 from . import rank
+from . import search
 
 def banded_matrix(N):
     arr = np.zeros((N,N))
