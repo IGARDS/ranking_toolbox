@@ -1,5 +1,8 @@
 import numpy as np
 
+from . import common
+from . import rank
+
 def banded_matrix(N):
     arr = np.zeros((N,N))
     for d in range(-N, N):
@@ -26,16 +29,16 @@ def beta(Xstar_r_r, normalize = True, average=False):
     return result
 
 def calc_beta(D):
-    obj,details = pyrankability.rank.solve(D,method="lop",cont=True)
-    Xstar = pd.DataFrame(pyrankability.common.threshold_x(details['x']),index=D.index,columns=D.columns)
+    obj,details = rank.solve(D,method="lop",cont=True)
+    Xstar = pd.DataFrame(common.threshold_x(details['x']),index=D.index,columns=D.columns)
     perm = details['P'][0] # select one permutation
     Xstar_r_r = Xstar.iloc[np.array(perm),np.array(perm)]
-    return pyrankability.features.beta(Xstar_r_r)
+    return beta(Xstar_r_r)
 
 def calc_nmos(D,max_num_solutions=1000):
-    obj_lop_scip,details_lop_scip = pyrankability.rank.solve(D,method="lop",include_model=True,cont=False)
+    obj_lop_scip,details_lop_scip = rank.solve(D,method="lop",include_model=True,cont=False)
     model = details_lop_scip['model']
-    model_file = pyrankability.common.write_model(model)
+    model_file = common.write_model(model)
     max_num_solutions = 1000
-    results = pyrankability.search.scip_collect(D,model_file,max_num_solutions=max_num_solutions) 
+    results = search.scip_collect(D,model_file,max_num_solutions=max_num_solutions) 
     return len(results['perms'])
