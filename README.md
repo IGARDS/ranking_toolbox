@@ -2,18 +2,11 @@
 This repo contains various implementations that provide insights into the rankability of data and the linear ordering problem.
 
 # Install instructions
-Add the following to /etc/profile
-<pre>
-export GUROBI_HOME="/usr/local/gurobi910/linux64" 
-export PATH="${PATH}:${GUROBI_HOME}/bin" 
-export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${GUROBI_HOME}/lib" 
-</pre>
-
-Copy environment.py to /opt/tljh/config/jupyterhub_config.d/environment.py
-
-Run sudo tljh-config reload hub
-
-sudo apt-get install libgraphviz-dev
+## Prerequisites
+graphviz headers must be installed:
+``bash
+sudo apt-get install -y libgraphviz-dev
+``
 
 ## Notes on running tests
 ``bash

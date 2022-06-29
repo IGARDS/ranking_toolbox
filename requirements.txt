@@ -1,9 +1,0 @@
-matplotlib
-pandas
-numpy
-joblib
-networkx
-altair
-pygraphviz
-scipy
-sklearn
