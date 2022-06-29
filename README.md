@@ -15,8 +15,14 @@ Run sudo tljh-config reload hub
 
 sudo apt-get install libgraphviz-dev
 
-# Dependencies
-git clone https://github.com/IGARDS/marchmadness_study.git ~/marchmadness_study
+## Notes on running tests
+``bash
+cd ranking_toolbox
+python3 -m venv ../env
+source ../env/bin/activate
+cd tests
+pytest tests.py
+``
 
 ## Authors
 Paul Anderson, Ph.D.<br>

@@ -9,7 +9,17 @@ setup(name='pyrankability',
       license='MIT',
       install_requires=[
           'gurobipy',
-          'matplotlib'
+          'matplotlib',
+          'pandas',
+          'networkx',
+          'altair',
+          'pygraphviz',
+          'scipy',
+          'sklearn',
+          'pytest',
+          'nx_altair',
+          'ipython',
+          'tqdm'
       ],
       packages=['pyrankability'],
       zip_safe=False)
