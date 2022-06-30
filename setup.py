@@ -5,7 +5,7 @@ this_directory = Path(__file__).parent
 long_description = open(f"{this_directory}/README.md").read()
 
 setup(name='pyrankability',
-      version='0.1',
+      version='0.1.4',
       description='Ranking Python Library',
       url='https://github.com/IGARDS/ranking_toolbox',
       author='Paul Anderson, Tim Chartier, Amy Langville, Kathryn Behling',
