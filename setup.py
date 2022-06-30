@@ -1,7 +1,7 @@
 from setuptools import setup
 
-this_directory = Path(__file__).parent
-long_description = (this_directory / "README.md").read_text()
+#this_directory = Path(__file__).parent
+#long_description = (this_directory / "README.md").read_text()
 
 setup(name='pyrankability',
       version='0.1',
@@ -24,6 +24,6 @@ setup(name='pyrankability',
           'ipython',
           'tqdm'
       ],
-      long_description=long_description,
+      long_description="Ranking Python Library",
       packages=['pyrankability'],
       zip_safe=False)
