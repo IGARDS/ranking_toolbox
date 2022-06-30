@@ -9,13 +9,13 @@ sudo apt-get install -y libgraphviz-dev
 ``
 
 ## Notes on running tests
-``bash
+```bash
 cd ranking_toolbox
 python3 -m venv ../env
 source ../env/bin/activate
 cd tests
 pytest tests.py
-``
+```
 
 ## Authors
 Paul Anderson, Ph.D.<br>
