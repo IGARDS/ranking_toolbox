@@ -4,9 +4,9 @@ This repo contains various implementations that provide insights into the rankab
 # Install instructions
 ## Prerequisites
 graphviz headers must be installed:
-``bash
+```bash
 sudo apt-get install -y libgraphviz-dev
-``
+```
 
 ## Notes on running tests
 ```bash
