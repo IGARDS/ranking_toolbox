@@ -9,7 +9,7 @@ setup(name='pyrankability',
       description='Ranking Python Library',
       url='https://github.com/IGARDS/ranking_toolbox',
       author='Paul Anderson, Tim Chartier, Amy Langville, Kathryn Behling',
-      author_email='pauleanderson',
+      author_email='pauleanderson@gmail.com',
       license='MIT',
       install_requires=[
           'gurobipy',
